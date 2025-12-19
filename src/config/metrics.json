@@ -1,0 +1,715 @@
+{
+  "version": "1.0",
+  "fdvTiers": {
+    "LargeCap": { "min": 1000000000, "label": "FDV ≥ $1B" },
+    "MidCap": {
+      "min": 100000000,
+      "max": 999999999,
+      "label": "FDV $100M - $1B"
+    },
+    "SmallCap": {
+      "min": 10000000,
+      "max": 99999999,
+      "label": "FDV $10M - $100M"
+    },
+    "MicroCap": { "max": 9999999, "label": "FDV < $10M" }
+  },
+  "exchangeTiers": {
+    "TierS": {
+      "exchanges": ["Binance", "OKX", "Coinbase", "Bybit"],
+      "avgSpreads": { "min": 0.04, "max": 0.25 },
+      "label": "Premium"
+    },
+    "Tier1": {
+      "exchanges": ["Gate.io", "KuCoin", "MEXC", "Bitmart"],
+      "avgSpreads": { "min": 0.25, "max": 0.5 },
+      "label": "Major"
+    },
+    "Tier2": {
+      "exchanges": ["Kraken", "AscendEX"],
+      "avgSpreads": { "min": 0.5, "max": 1.0 },
+      "label": "Mid-Tier"
+    },
+    "Tier3": {
+      "exchanges": ["Other"],
+      "avgSpreads": { "min": 1.0 },
+      "label": "Smaller"
+    }
+  },
+  "metrics": [
+    {
+      "id": "agreementStructure",
+      "name": "Agreement Structure & Balance",
+      "weight": 0.25,
+      "components": [
+        {
+          "id": "terminationRights",
+          "name": "Termination Rights",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 10,
+              "description": "Equal termination rights with same notice period",
+              "condition": "facts.terminationRights === 'equal' && facts.sameNoticePeriod === true"
+            },
+            {
+              "score": 8,
+              "description": "Minor asymmetries but reasonable termination",
+              "condition": "facts.terminationRights === 'minorAsymmetry' && facts.bothCanTerminate === true"
+            },
+            {
+              "score": 6,
+              "description": "Some imbalance but termination possible",
+              "condition": "facts.terminationRights === 'someImbalance' && facts.bothCanTerminate === true"
+            },
+            {
+              "score": 3,
+              "description": "Heavily favors one party but some rights exist",
+              "condition": "facts.terminationRights === 'heavilyFavorsOne' && facts.someRightsExist === true"
+            },
+            {
+              "score": 0,
+              "description": "One-sided or no termination rights",
+              "condition": "facts.terminationRights === 'oneSided' || facts.terminationRights === 'noProjectRights' || facts.terminationRights === null",
+              "autoDowngrade": 2
+            }
+          ]
+        },
+        {
+          "id": "noticePeriods",
+          "name": "Notice Periods & Wind-down",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 8,
+              "description": "30-60 days notice with clear wind-down",
+              "condition": "facts.noticePeriodDays >= 30 && facts.noticePeriodDays <= 60 && facts.windDownDays >= 7 && facts.windDownDays <= 30"
+            },
+            {
+              "score": 6,
+              "description": "60-90 days notice with wind-down",
+              "condition": "facts.noticePeriodDays >= 60 && facts.noticePeriodDays <= 90 && facts.windDownDefined === true"
+            },
+            {
+              "score": 4,
+              "description": "90-120 days notice with wind-down",
+              "condition": "facts.noticePeriodDays >= 90 && facts.noticePeriodDays <= 120 && facts.windDownDefined === true"
+            },
+            {
+              "score": 2,
+              "description": ">120 days notice with procedures",
+              "condition": "facts.noticePeriodDays > 120 && facts.windDownDefined === true"
+            },
+            {
+              "score": 0,
+              "description": "Excessive notice or unclear procedures",
+              "condition": "facts.noticePeriodDays > 180 || facts.windDownDefined === false"
+            }
+          ]
+        },
+        {
+          "id": "forceMajeure",
+          "name": "Force Majeure & Extraordinary Events",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 7,
+              "description": "Clear force majeure for both parties",
+              "condition": "facts.forceMajeure === 'equalCoverage'"
+            },
+            {
+              "score": 5,
+              "description": "Standard force majeure with minor gaps",
+              "condition": "facts.forceMajeure === 'standardWithMinorGaps'"
+            },
+            {
+              "score": 3,
+              "description": "Basic force majeure provisions",
+              "condition": "facts.forceMajeure === 'basic'"
+            },
+            {
+              "score": 1,
+              "description": "Weak or one-sided force majeure",
+              "condition": "facts.forceMajeure === 'weakOrOneSided'"
+            },
+            {
+              "score": 0,
+              "description": "No force majeure provisions",
+              "condition": "facts.forceMajeure === null"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tokenEconomics",
+      "name": "Token Economics & Allocation",
+      "weight": 0.2,
+      "fdvDependent": true,
+      "components": [
+        {
+          "id": "allocationSize",
+          "name": "Allocation Size",
+          "scoring": [
+            {
+              "tier": "LargeCap",
+              "ranges": [
+                { "max": 0.3, "score": 20 },
+                { "max": 0.6, "score": 16 },
+                { "max": 1.0, "score": 12 },
+                { "max": 1.5, "score": 8 },
+                { "max": 2.5, "score": 4 },
+                { "score": 0, "autoDowngrade": 2 }
+              ]
+            },
+            {
+              "tier": "MidCap",
+              "ranges": [
+                { "max": 0.6, "score": 20 },
+                { "max": 1.2, "score": 16 },
+                { "max": 2.5, "score": 12 },
+                { "max": 4.0, "score": 8 },
+                { "max": 6.0, "score": 4 },
+                { "score": 0, "autoDowngrade": 2 }
+              ]
+            },
+            {
+              "tier": "SmallCap",
+              "ranges": [
+                { "max": 1.5, "score": 20 },
+                { "max": 3.0, "score": 16 },
+                { "max": 5.0, "score": 12 },
+                { "max": 8.0, "score": 8 },
+                { "max": 12.0, "score": 4 },
+                { "score": 0, "autoDowngrade": 2 }
+              ]
+            },
+            {
+              "tier": "MicroCap",
+              "ranges": [
+                { "max": 3.0, "score": 20 },
+                { "max": 6.0, "score": 16 },
+                { "max": 10.0, "score": 12 },
+                { "max": 15.0, "score": 8 },
+                { "max": 20.0, "score": 4 },
+                { "score": 0, "autoDowngrade": 2 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "spreadRequirements",
+      "name": "Spread Requirements Realism",
+      "weight": 0.15,
+      "exchangeDependent": true,
+      "components": [
+        {
+          "id": "maxSpread",
+          "name": "Maximum Allowed Spread",
+          "scoring": [
+            {
+              "tier": "TierS",
+              "ranges": [
+                { "max": 0.25, "score": 15 },
+                { "max": 0.5, "score": 12 },
+                { "max": 0.75, "score": 8 },
+                { "max": 1.0, "score": 4 },
+                { "score": 0, "autoDowngrade": 1 }
+              ]
+            },
+            {
+              "tier": "Tier1",
+              "ranges": [
+                { "max": 0.5, "score": 15 },
+                { "max": 1.0, "score": 12 },
+                { "max": 1.5, "score": 8 },
+                { "max": 2.0, "score": 4 },
+                { "score": 0, "autoDowngrade": 1 }
+              ]
+            },
+            {
+              "tier": "Tier2",
+              "ranges": [
+                { "max": 1.0, "score": 15 },
+                { "max": 2.0, "score": 12 },
+                { "max": 3.0, "score": 8 },
+                { "max": 4.0, "score": 4 },
+                { "score": 0, "autoDowngrade": 1 }
+              ]
+            },
+            {
+              "tier": "Tier3",
+              "ranges": [
+                { "max": 2.0, "score": 15 },
+                { "max": 4.0, "score": 12 },
+                { "max": 6.0, "score": 8 },
+                { "max": 8.0, "score": 4 },
+                { "score": 0, "autoDowngrade": 1 }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "callOptions",
+      "name": "Call Option & Vesting Terms",
+      "weight": 0.15,
+      "components": [
+        {
+          "id": "exercisePeriod",
+          "name": "Exercise Period & Unlock Schedule",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 5,
+              "description": "12+ months with linear unlock",
+              "condition": "facts.exercisePeriodMonths >= 12 && facts.unlockSchedule === 'linearOrStructured'"
+            },
+            {
+              "score": 4,
+              "description": "6-12 months with reasonable unlock",
+              "condition": "facts.exercisePeriodMonths >= 6 && facts.exercisePeriodMonths <= 12 && facts.unlockSchedule === 'reasonable'"
+            },
+            {
+              "score": 3,
+              "description": "3-6 months with partial early unlock",
+              "condition": "facts.exercisePeriodMonths >= 3 && facts.exercisePeriodMonths <= 6 && facts.unlockSchedule === 'partialEarly'"
+            },
+            {
+              "score": 2,
+              "description": "1-3 months with no restrictions",
+              "condition": "facts.exercisePeriodMonths >= 1 && facts.exercisePeriodMonths <= 3 && facts.unlockSchedule === 'unrestricted'"
+            },
+            {
+              "score": 0,
+              "description": "Immediate or front-loaded exercise",
+              "condition": "facts.exercisePeriodMonths < 1 || facts.exercisePercentFirstThreeMonths >= 50",
+              "autoDowngrade": 1
+            }
+          ]
+        },
+        {
+          "id": "strikePrice",
+          "name": "Strike Price Structure",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 5,
+              "description": "Strike price indexed with 10-30% premium",
+              "condition": "facts.strikePrice === 'indexedToFMV' && facts.premiumPercent >= 10 && facts.premiumPercent <= 30"
+            },
+            {
+              "score": 4,
+              "description": "Modest premium over spot",
+              "condition": "facts.strikePrice === 'modestPremium' && facts.premiumPercent >= 0 && facts.premiumPercent <= 10"
+            },
+            {
+              "score": 3,
+              "description": "Flat strike price",
+              "condition": "facts.strikePrice === 'flat'"
+            },
+            {
+              "score": 2,
+              "description": "Discounted strike price",
+              "condition": "facts.strikePrice === 'discounted'"
+            },
+            {
+              "score": 0,
+              "description": "Highly favorable strike price",
+              "condition": "facts.strikePrice === 'highlyFavorable'"
+            }
+          ]
+        },
+        {
+          "id": "clawback",
+          "name": "Clawback Provisions",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 5,
+              "description": "Strong clawback provisions",
+              "condition": "facts.clawback === 'strong'"
+            },
+            {
+              "score": 4,
+              "description": "Moderate clawback provisions",
+              "condition": "facts.clawback === 'moderate'"
+            },
+            {
+              "score": 3,
+              "description": "Basic clawback provisions",
+              "condition": "facts.clawback === 'basic'"
+            },
+            {
+              "score": 2,
+              "description": "Weak clawback provisions",
+              "condition": "facts.clawback === 'weak'"
+            },
+            {
+              "score": 0,
+              "description": "No clawback provisions",
+              "condition": "facts.clawback === null",
+              "autoDowngrade": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "kpis",
+      "name": "Performance KPIs & Reporting",
+      "weight": 0.1,
+      "components": [
+        {
+          "id": "kpiClarity",
+          "name": "KPI Clarity & Measurability",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 5,
+              "description": "Clear and measurable KPIs",
+              "condition": "facts.kpiClarity === 'clearAndMeasurable'"
+            },
+            {
+              "score": 4,
+              "description": "Well-defined KPIs with minor ambiguities",
+              "condition": "facts.kpiClarity === 'wellDefinedMinorAmbiguities'"
+            },
+            {
+              "score": 3,
+              "description": "Generally clear KPIs",
+              "condition": "facts.kpiClarity === 'generallyClear'"
+            },
+            {
+              "score": 2,
+              "description": "Basic KPIs with gaps",
+              "condition": "facts.kpiClarity === 'basicWithGaps'"
+            },
+            {
+              "score": 0,
+              "description": "Vague or no KPIs",
+              "condition": "facts.kpiClarity === 'vagueOrNone' || facts.kpiClarity === null",
+              "autoDowngrade": 2
+            }
+          ]
+        },
+        {
+          "id": "reporting",
+          "name": "Reporting Requirements",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 3,
+              "description": "Real-time or daily reporting",
+              "condition": "facts.reporting === 'realTimeOrDaily'"
+            },
+            {
+              "score": 2,
+              "description": "Regular reporting",
+              "condition": "facts.reporting === 'regular'"
+            },
+            {
+              "score": 1,
+              "description": "Basic reporting",
+              "condition": "facts.reporting === 'basic'"
+            },
+            {
+              "score": 0,
+              "description": "Unclear or no reporting",
+              "condition": "facts.reporting === 'unclearOrNone' || facts.reporting === null"
+            }
+          ]
+        },
+        {
+          "id": "kpiAdaptability",
+          "name": "KPI Adaptability",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 2,
+              "description": "Automatic KPI adjustments",
+              "condition": "facts.kpiAdaptability === 'automatic'"
+            },
+            {
+              "score": 1,
+              "description": "Some flexibility in KPIs",
+              "condition": "facts.kpiAdaptability === 'someFlexibility'"
+            },
+            {
+              "score": 0,
+              "description": "Fixed KPIs",
+              "condition": "facts.kpiAdaptability === 'fixed'"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "remedies",
+      "name": "Remedies & Dispute Resolution",
+      "weight": 0.1,
+      "components": [
+        {
+          "id": "remedyStructure",
+          "name": "Remedy Structure",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 4,
+              "description": "Graduated remedies with clear cure periods",
+              "condition": "facts.remedyStructure === 'graduated' && facts.curePeriodDays >= 30"
+            },
+            {
+              "score": 3,
+              "description": "Clear remedies with cure periods",
+              "condition": "facts.remedyStructure === 'clear' && facts.curePeriodDays >= 15"
+            },
+            {
+              "score": 2,
+              "description": "Basic remedies",
+              "condition": "facts.remedyStructure === 'basic'"
+            },
+            {
+              "score": 1,
+              "description": "Harsh remedies with short cure periods",
+              "condition": "facts.remedyStructure === 'harsh' && facts.curePeriodDays < 15"
+            },
+            {
+              "score": 0,
+              "description": "Excessive or no remedies",
+              "condition": "facts.remedyStructure === 'excessiveOrNone' || facts.remedyStructure === null"
+            }
+          ]
+        },
+        {
+          "id": "disputeResolution",
+          "name": "Dispute Resolution Mechanism",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 3,
+              "description": "Professional arbitration",
+              "condition": "facts.disputeResolution === 'arbitration'"
+            },
+            {
+              "score": 2,
+              "description": "Defined dispute process",
+              "condition": "facts.disputeResolution === 'definedProcess'"
+            },
+            {
+              "score": 1,
+              "description": "Basic dispute provisions",
+              "condition": "facts.disputeResolution === 'basic'"
+            },
+            {
+              "score": 0,
+              "description": "Unclear or unfavorable dispute resolution",
+              "condition": "facts.disputeResolution === 'unclearOrUnfavorable' || facts.disputeResolution === null",
+              "autoDowngrade": 1
+            }
+          ]
+        },
+        {
+          "id": "assetProtection",
+          "name": "Asset Protection & Segregation",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 3,
+              "description": "Clear segregation of assets",
+              "condition": "facts.assetProtection === 'clearSegregation'"
+            },
+            {
+              "score": 2,
+              "description": "Basic asset protection",
+              "condition": "facts.assetProtection === 'basic'"
+            },
+            {
+              "score": 1,
+              "description": "Limited asset protection",
+              "condition": "facts.assetProtection === 'limited'"
+            },
+            {
+              "score": 0,
+              "description": "Unclear or inadequate asset protection",
+              "condition": "facts.assetProtection === 'unclearOrInadequate' || facts.assetProtection === null",
+              "autoDowngrade": 1
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "commercialTerms",
+      "name": "Commercial Terms & Obligations",
+      "weight": 0.05,
+      "components": [
+        {
+          "id": "feeStructure",
+          "name": "Fee Structure",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 3,
+              "description": "Performance-based fees",
+              "condition": "facts.feeStructure === 'performanceBased'"
+            },
+            {
+              "score": 2,
+              "description": "Mixed reasonable fees",
+              "condition": "facts.feeStructure === 'mixedReasonable'"
+            },
+            {
+              "score": 1,
+              "description": "Acceptable fees with concerns",
+              "condition": "facts.feeStructure === 'acceptableWithConcerns'"
+            },
+            {
+              "score": 0,
+              "description": "Excessive or unfair fees",
+              "condition": "facts.feeStructure === 'excessiveOrUnfair' || facts.feeStructure === null"
+            }
+          ]
+        },
+        {
+          "id": "exclusivity",
+          "name": "Exclusivity Terms",
+          "weight": 1,
+          "scoring": [
+            {
+              "score": 2,
+              "description": "No exclusivity or <6 months",
+              "condition": "facts.exclusivityMonths === 0 || facts.exclusivityMonths <= 6"
+            },
+            {
+              "score": 1,
+              "description": "6-12 months exclusivity",
+              "condition": "facts.exclusivityMonths > 6 && facts.exclusivityMonths <= 12"
+            },
+            {
+              "score": 0,
+              "description": ">12 months exclusivity",
+              "condition": "facts.exclusivityMonths > 12",
+              "autoDowngrade": 1
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "ratingScale": [
+    {
+      "min": 90,
+      "grade": "AAA",
+      "description": "Exceptional Agreement Structure"
+    },
+    { "min": 80, "grade": "AA", "description": "Very Strong Agreement" },
+    { "min": 70, "grade": "A", "description": "Strong Agreement" },
+    { "min": 60, "grade": "BBB", "description": "Adequate Agreement" },
+    { "min": 50, "grade": "BB", "description": "Below Average Agreement" },
+    { "min": 40, "grade": "B", "description": "Poor Agreement Structure" },
+    { "min": 30, "grade": "CCC", "description": "Very Poor Agreement" },
+    { "min": 20, "grade": "CC", "description": "Extremely Poor Agreement" },
+    { "min": 10, "grade": "C", "description": "Near Unacceptable Terms" },
+    { "min": 0, "grade": "D", "description": "Unacceptable Agreement" }
+  ],
+  "autoDowngrades": [
+    {
+      "condition": "facts.terminationRights === 'noProjectRights'",
+      "adjustment": -20
+    },
+    {
+      "condition": "facts.allocationSize > 3 * facts.fdvTierMax",
+      "adjustment": -20
+    },
+    {
+      "condition": "facts.exercisePercentFirstThreeMonths >= 50 && facts.clawback === null",
+      "adjustment": -10
+    },
+    {
+      "condition": "facts.kpiClarity === 'vagueOrNone'",
+      "adjustment": -10
+    },
+    {
+      "condition": "facts.maxSpread > 2 * facts.exchangeTierMax",
+      "adjustment": -10
+    },
+    {
+      "condition": "facts.disputeResolution === 'unclearOrUnfavorable'",
+      "adjustment": -10
+    },
+    {
+      "condition": "facts.assetProtection === 'unclearOrInadequate'",
+      "adjustment": -10
+    },
+    {
+      "condition": "facts.exclusivityMonths > 12",
+      "adjustment": -5
+    }
+  ],
+  "redFlags": {
+    "critical": [
+      {
+        "condition": "facts.terminationRights === 'noProjectRights'",
+        "description": "No termination rights for project team"
+      },
+      {
+        "condition": "facts.allocationSize > 20",
+        "description": "Token allocation >20% regardless of FDV"
+      },
+      {
+        "condition": "facts.exercisePercentFirstThreeMonths === 100",
+        "description": "Immediate full option exercise rights"
+      },
+      {
+        "condition": "facts.kpiClarity === 'vagueOrNone'",
+        "description": "No performance requirements or KPIs"
+      },
+      {
+        "condition": "facts.maxSpread > 2 * facts.exchangeTierMax",
+        "description": "Spread requirements impossible for exchange tier"
+      },
+      {
+        "condition": "facts.disputeResolution === 'unclearOrUnfavorable'",
+        "description": "No dispute resolution mechanism"
+      },
+      {
+        "condition": "facts.assetProtection === 'unclearOrInadequate'",
+        "description": "Assets not segregated or unclear return procedures"
+      }
+    ],
+    "major": [
+      {
+        "condition": "facts.terminationRights === 'heavilyFavorsOne'",
+        "description": "Heavily asymmetric termination rights"
+      },
+      {
+        "condition": "facts.allocationSize > 2 * facts.fdvTierMax",
+        "description": "Token allocation 2-3x recommended for FDV tier"
+      },
+      {
+        "condition": "facts.exercisePercentFirstSixMonths >= 50",
+        "description": "Front-loaded option exercise (>50% in first 6 months)"
+      },
+      {
+        "condition": "facts.kpiClarity === 'basicWithGaps'",
+        "description": "Vague or unmeasurable KPIs"
+      },
+      {
+        "condition": "facts.noticePeriodDays > 120",
+        "description": "Excessive notice periods (>120 days)"
+      },
+      {
+        "condition": "facts.remedyStructure === 'harsh' && facts.curePeriodDays < 15",
+        "description": "Punitive penalties with no cure periods"
+      },
+      {
+        "condition": "facts.exclusivityMonths > 12",
+        "description": "Long exclusivity periods (>12 months)"
+      }
+    ]
+  }
+}

@@ -1,0 +1,132 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              Int           @id @default(autoincrement())
+  name            String
+  email           String?       @unique
+  password        String?
+  username        String?
+  googleId        String?       @unique
+  telegramId      String?       @unique
+  twitterId       String?       @unique
+  role            String        @default("USER")
+  createdAt       DateTime      @default(now())
+  isEmailVerified Boolean       @default(false)
+  stripeCustomerId String?      @unique
+  RefreshToken    RefreshToken?
+  Otp             Otp?
+  files           File[]
+  chatLogs        ChatLog[]
+  subscription    Subscription?
+  usageLogs       UsageLog[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String
+  userId    Int      @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  // relation to User (optional, if you already have User model)
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Otp {
+  id        String   @id @default(uuid())
+  otp       String
+  userId    Int      @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  // relation to User (optional, if you already have User model)
+  user User @relation(fields: [userId], references: [id])
+}
+
+model File {
+  id            Int             @id @default(autoincrement())
+  userId        Int
+  user          User            @relation(fields: [userId], references: [id])
+  filename      String
+  filetype      String
+  filesize      Int
+  filepath      String
+  extractedText String?         @db.Text
+  createdAt     DateTime        @default(now())
+  chatLogs      ChatLog[]
+  reviews       Review[]
+  extractedFact ExtractedFact?
+}
+
+model ExtractedFact {
+  id        Int      @id @default(autoincrement())
+  fileId    Int      @unique
+  file      File     @relation(fields: [fileId], references: [id])
+  facts     Json
+  createdAt DateTime @default(now())
+}
+
+model ChatLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  fileId    Int
+  file      File     @relation(fields: [fileId], references: [id])
+  question  String
+  answer    String
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  fileId    Int
+  file      File     @relation(fields: [fileId], references: [id])
+  content   Json
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id                    Int      @id @default(autoincrement())
+  userId                Int      @unique
+  user                  User     @relation(fields: [userId], references: [id])
+  stripeSubscriptionId  String   @unique
+  stripePriceId         String
+  stripeProductId       String
+  plan                  String   // "basic", "pro", "premium"
+  status                String   // "active", "canceled", "past_due", "trialing"
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  cancelAtPeriodEnd     Boolean  @default(false)
+  
+  // Plan limits
+  maxFileAnalyses       Int      // Monthly limit for file analyses
+  maxChatMessages       Int      // Monthly limit for chat messages
+  
+  // Usage tracking (resets monthly)
+  usedFileAnalyses      Int      @default(0)
+  usedChatMessages      Int      @default(0)
+  usageResetAt          DateTime @default(now())
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model UsageLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+  usageType   String   // "file_analysis", "chat_message"
+  fileId      Int?
+  chatLogId   Int?
+  metadata    Json?    // Additional context
+  createdAt   DateTime @default(now())
+  
+  @@index([userId, usageType, createdAt])
+}

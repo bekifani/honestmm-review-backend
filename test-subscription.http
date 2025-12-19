@@ -1,0 +1,108 @@
+### Subscription System API Tests
+### Use REST Client extension in VS Code or import to Postman
+
+@baseUrl = http://localhost:3001/api
+@token = YOUR_AUTH_TOKEN_HERE
+
+### 1. Get Available Plans (Public)
+GET {{baseUrl}}/subscription/plans
+Content-Type: application/json
+
+###
+
+### 2. Get Current Subscription (Protected)
+GET {{baseUrl}}/subscription/current
+Authorization: Bearer {{token}}
+
+###
+
+### 3. Get Usage Statistics (Protected)
+GET {{baseUrl}}/subscription/usage
+Authorization: Bearer {{token}}
+
+###
+
+### 4. Create Checkout Session (Protected)
+POST {{baseUrl}}/subscription/checkout
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "plan": "basic",
+  "stripePriceId": "price_YOUR_STRIPE_PRICE_ID"
+}
+
+###
+
+### 5. Create Billing Portal Session (Protected)
+POST {{baseUrl}}/subscription/billing-portal
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+###
+
+### 6. Cancel Subscription (Protected)
+POST {{baseUrl}}/subscription/cancel
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "cancelAtPeriodEnd": true
+}
+
+###
+
+### 7. Test File Analysis with Limit Check (Protected)
+POST {{baseUrl}}/file/1/analyze
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+###
+
+### 8. Test Chat with Limit Check (Protected)
+POST {{baseUrl}}/chat
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "fileId": 1,
+  "question": "What are the key terms?",
+  "answer": "The key terms include..."
+}
+
+###
+
+### Expected Responses:
+
+# When limit is reached:
+# {
+#   "error": "File analysis limit reached",
+#   "message": "You have reached your monthly file analysis limit. Please upgrade your plan.",
+#   "limit": 10,
+#   "remaining": 0
+# }
+
+# When no subscription:
+# {
+#   "error": "No active subscription",
+#   "message": "You need an active subscription to access this feature."
+# }
+
+# Usage stats response:
+# {
+#   "hasSubscription": true,
+#   "plan": "basic",
+#   "status": "active",
+#   "fileAnalyses": {
+#     "used": 3,
+#     "limit": 10,
+#     "remaining": 7
+#   },
+#   "chatMessages": {
+#     "used": 15,
+#     "limit": 50,
+#     "remaining": 35
+#   },
+#   "currentPeriodEnd": "2025-01-18T12:00:00.000Z",
+#   "usageResetAt": "2025-01-18T12:00:00.000Z"
+# }
