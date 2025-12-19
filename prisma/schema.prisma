@@ -81,6 +81,7 @@ model ChatLog {
   file      File     @relation(fields: [fileId], references: [id])
   question  String
   answer    String
+  sessionId String   @default("default")
   createdAt DateTime @default(now())
 }
 
