@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { SubscriptionService } from "../services/subscriptionService";
 import { stripe, SUBSCRIPTION_PLANS } from "../config/stripe";
 import Stripe from "stripe";
+import prisma from "../config/prisma";
 
 const subscriptionService = new SubscriptionService();
 
@@ -16,6 +17,111 @@ export const getPlans = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("Get plans error:", error);
     res.status(500).json({ error: "Failed to fetch plans" });
+  }
+};
+
+/**
+ * Verify checkout session (fallback verification in addition to webhook)
+ * Frontend should send the Stripe Checkout session_id from success URL.
+ */
+export const verifyCheckoutSession = async (req: Request, res: Response) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { sessionId, checkoutSessionId } = req.body as { sessionId?: string; checkoutSessionId?: string };
+    const sid = sessionId || checkoutSessionId;
+    if (!sid) {
+      return res.status(400).json({ error: "Missing sessionId" });
+    }
+
+    // Retrieve Checkout Session
+    const session = await stripe.checkout.sessions.retrieve(sid);
+    if (!session) {
+      return res.status(404).json({ error: "Session not found" });
+    }
+
+    // Ensure session belongs to this user via metadata or customer match
+    const metaUserId = session.metadata?.userId ? parseInt(session.metadata.userId) : undefined;
+    if (metaUserId && metaUserId !== userId) {
+      return res.status(403).json({ error: "Session metadata does not match user" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { stripeCustomerId: true } });
+    if (user?.stripeCustomerId && session.customer && typeof session.customer === "string" && session.customer !== user.stripeCustomerId) {
+      return res.status(403).json({ error: "Session does not belong to this user" });
+    }
+
+    // Validate subscription on session
+    const subscriptionId = session.subscription as string | null;
+    if (!subscriptionId) {
+      return res.status(400).json({ error: "Session has no subscription" });
+    }
+
+    const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+    const firstItem = stripeSub.items.data[0];
+    const priceId = firstItem?.price?.id as string | undefined;
+    const productId = firstItem?.price?.product as string | undefined;
+
+    // Resolve plan from metadata or price id mapping
+    let plan = (session.metadata?.plan as keyof typeof SUBSCRIPTION_PLANS | undefined) || undefined;
+    if (!plan && priceId) {
+      for (const [p, cfg] of Object.entries(SUBSCRIPTION_PLANS)) {
+        if ((cfg as any).priceId && (cfg as any).priceId === priceId) {
+          plan = p as keyof typeof SUBSCRIPTION_PLANS;
+          break;
+        }
+      }
+    }
+    if (!plan) {
+      return res.status(400).json({ error: "Unable to resolve plan from session" });
+    }
+
+    const currentPeriodStart = new Date(((stripeSub as any).current_period_start || 0) * 1000);
+    const currentPeriodEnd = new Date(((stripeSub as any).current_period_end || 0) * 1000);
+
+    // Idempotent create/update
+    const existingByStripe = await prisma.subscription.findUnique({ where: { stripeSubscriptionId: stripeSub.id } });
+    const planCfg = SUBSCRIPTION_PLANS[plan];
+
+    if (!existingByStripe) {
+      const existingByUser = await prisma.subscription.findUnique({ where: { userId } });
+      if (existingByUser) {
+        await prisma.subscription.update({
+          where: { userId },
+          data: {
+            stripeSubscriptionId: stripeSub.id,
+            stripePriceId: priceId || existingByUser.stripePriceId,
+            stripeProductId: productId || existingByUser.stripeProductId,
+            plan: plan as string,
+            status: stripeSub.status,
+            currentPeriodStart,
+            currentPeriodEnd,
+            maxFileAnalyses: planCfg.maxFileAnalyses,
+            maxChatMessages: planCfg.maxChatMessages,
+            usageResetAt: currentPeriodEnd,
+            cancelAtPeriodEnd: false,
+          },
+        });
+      } else {
+        await subscriptionService.createSubscription(
+          userId,
+          stripeSub.id,
+          priceId || "",
+          productId || "",
+          plan as any,
+          currentPeriodStart,
+          currentPeriodEnd
+        );
+      }
+    }
+
+    return res.json({ verified: true, status: stripeSub.status, plan, stripeSubscriptionId: stripeSub.id });
+  } catch (error) {
+    console.error("Verify checkout session error:", error);
+    return res.status(500).json({ error: "Failed to verify session" });
   }
 };
 
@@ -319,10 +425,34 @@ export const getUsageStats = async (req: Request, res: Response) => {
     const subscription = await subscriptionService.getUserSubscription(userId);
 
     if (!subscription) {
+      // Free plan usage: one-time trial limits from env (default 3 files, 5 chats)
+      const FREE_FILE_ANALYSES = Number(process.env.FREE_FILE_ANALYSES ?? 3);
+      const FREE_CHAT_MESSAGES = Number(process.env.FREE_CHAT_MESSAGES ?? 5);
+
+      const usedFiles = await prisma.usageLog.count({
+        where: { userId, usageType: "file_analysis" },
+      });
+      const usedChats = await prisma.usageLog.count({
+        where: { userId, usageType: "chat_message" },
+      });
+
+      const remainingFiles = Math.max(0, FREE_FILE_ANALYSES - usedFiles);
+      const remainingChats = Math.max(0, FREE_CHAT_MESSAGES - usedChats);
+
       return res.json({
         hasSubscription: false,
-        fileAnalyses: { used: 0, limit: 0, remaining: 0 },
-        chatMessages: { used: 0, limit: 0, remaining: 0 },
+        plan: "free",
+        status: "trial",
+        fileAnalyses: {
+          used: usedFiles,
+          limit: FREE_FILE_ANALYSES,
+          remaining: remainingFiles,
+        },
+        chatMessages: {
+          used: usedChats,
+          limit: FREE_CHAT_MESSAGES,
+          remaining: remainingChats,
+        },
       });
     }
 

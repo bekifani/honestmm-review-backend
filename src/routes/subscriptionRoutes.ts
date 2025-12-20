@@ -7,6 +7,7 @@ import {
   createBillingPortalSession,
   handleWebhook,
   getUsageStats,
+  verifyCheckoutSession,
 } from "../controllers/subscriptionController";
 import { requireAuth } from "../middleware/auth";
 
@@ -24,6 +25,7 @@ router.get("/plans", getPlans);
 
 // Protected routes (require authentication)
 router.post("/checkout", requireAuth, createCheckoutSession);
+router.post("/verify", requireAuth, verifyCheckoutSession);
 router.get("/current", requireAuth, getCurrentSubscription);
 router.post("/cancel", requireAuth, cancelSubscription);
 router.post("/billing-portal", requireAuth, createBillingPortalSession);

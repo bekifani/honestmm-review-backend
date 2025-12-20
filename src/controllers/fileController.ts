@@ -23,6 +23,25 @@ export const uploadFile = async (req: Request, res: Response) => {
       return res.status(401).json({ error: "Unauthorized" });
     }
 
+    // Free plan: limit number of uploaded files (lifetime) when no active subscription
+    const subscription = await subscriptionService.getUserSubscription(userId);
+    if (!subscription || subscription.status !== "active") {
+      const FREE_FILE_UPLOADS = Number(process.env.FREE_FILE_UPLOADS ?? 3);
+      if (FREE_FILE_UPLOADS > 0) {
+        const usedUploads = await prisma.usageLog.count({
+          where: { userId, usageType: "file_upload" },
+        });
+        if (usedUploads >= FREE_FILE_UPLOADS) {
+          return res.status(403).json({
+            error: "Free upload limit reached",
+            message: `Free plan allows up to ${FREE_FILE_UPLOADS} uploaded files. Please upgrade your plan to upload more files.`,
+            limit: FREE_FILE_UPLOADS,
+            used: usedUploads,
+          });
+        }
+      }
+    }
+
     const { originalname, mimetype, size, buffer } = req.file;
     const filepath = await uploader(req, req.file);
 
@@ -53,6 +72,16 @@ export const uploadFile = async (req: Request, res: Response) => {
         filesize: size,
         filepath: filepath,
         extractedText: extractedText || null,
+      },
+    });
+
+    // Log usage for free-plan lifetime counting
+    await prisma.usageLog.create({
+      data: {
+        userId,
+        usageType: "file_upload",
+        fileId: file.id,
+        metadata: { filename: originalname, filesize: size },
       },
     });
 

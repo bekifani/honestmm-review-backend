@@ -10,7 +10,7 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export const SUBSCRIPTION_PLANS = {
   basic: {
     name: "Basic",
-    priceId: process.env.BASIC_PRICE_ID || "price_1Sg49YLpI5TdrxfFaAbDZHrk",
+    priceId: process.env.BASIC_PRICE_ID || "price_1Sfw1zLmn5wXUd0g5B4JlI2N",
     maxFileAnalyses: 10,
     maxChatMessages: 50,
     features: [
@@ -22,7 +22,7 @@ export const SUBSCRIPTION_PLANS = {
   },
   pro: {
     name: "Pro",
-    priceId: process.env.PRO_PRICE_ID || "price_1Sg4K5LpI5TdrxfFDQscX99Q",
+    priceId: process.env.PRO_PRICE_ID || "price_1Sfw3sLmn5wXUd0gR7WbJTkq",
     maxFileAnalyses: 50,
     maxChatMessages: 300,
     features: [
@@ -35,7 +35,7 @@ export const SUBSCRIPTION_PLANS = {
   },
   premium: {
     name: "Premium",
-    priceId: process.env.PREMIUM_PRICE_ID || "price_1Sg4KpLpI5TdrxfF1kBiqCGK",
+    priceId: process.env.PREMIUM_PRICE_ID || "price_1Sfw4ILmn5wXUd0gvYFSF0Y7",
     maxFileAnalyses: -1, // Unlimited
     maxChatMessages: -1, // Unlimited
     features: [

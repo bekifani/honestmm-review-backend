@@ -3,6 +3,8 @@ import prisma from "../config/prisma";
 import Stripe from "stripe";
 
 export class SubscriptionService {
+  private readonly FREE_FILE_ANALYSES = Number(process.env.FREE_FILE_ANALYSES ?? 3);
+  private readonly FREE_CHAT_MESSAGES = Number(process.env.FREE_CHAT_MESSAGES ?? 5);
   /**
    * Create or retrieve Stripe customer for user
    */
@@ -165,9 +167,23 @@ export class SubscriptionService {
       where: { userId },
     });
 
-    // No subscription - deny access
+    // No active subscription -> apply FREE plan limits using UsageLog counts (lifetime)
     if (!subscription || subscription.status !== "active") {
-      return { allowed: false, remaining: 0, limit: 0 };
+      const freeLimit =
+        usageType === "file_analysis"
+          ? this.FREE_FILE_ANALYSES
+          : this.FREE_CHAT_MESSAGES;
+
+      if (!freeLimit || freeLimit <= 0) {
+        return { allowed: false, remaining: 0, limit: 0 };
+      }
+
+      const used = await prisma.usageLog.count({
+        where: { userId, usageType },
+      });
+
+      const remaining = Math.max(0, freeLimit - used);
+      return { allowed: remaining > 0, remaining, limit: freeLimit };
     }
 
     // Check if usage needs to be reset (new billing period)
