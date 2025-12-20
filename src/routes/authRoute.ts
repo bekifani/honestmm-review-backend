@@ -17,18 +17,21 @@ if (process.env.NODE_ENV === 'production') {
 
 router.get(
   "/google",
-  passport.authenticate("google", {
+  // @ts-ignore
+  passport.authenticate("google-login", {
     scope: ["profile", "email"],
     session: false,
+    state: false // Disable state to prevent session requirement
   })
 );
 router.get(
   "/google/callback",
-  passport.authenticate("google", {
+  // @ts-ignore
+  passport.authenticate("google-login", {
     scope: ["profile", "email"],
-
     failureRedirect: "/login",
     session: false,
+    state: false // Disable state check
   }),
   async (req, res) => {
     const user = req.user as {
@@ -57,38 +60,36 @@ router.get(
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    const userData = user;
     const origins = (process.env.FRONTEND_ORIGINS || '')
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean);
-    const clientUrl = origins[0];
+    const clientUrl = process.env.CLIENT_URL || origins[0];
+
+    // REDIRECT TO FRONTEND (Secure Cookie Handoff)
+    // No tokens in URL. Frontend's useRefreshTokenQuery will pick up the cookie.
     if (clientUrl) {
-      res.redirect(
-        `${clientUrl}/?token=${tokens.accessToken}&user=${encodeURIComponent(
-          JSON.stringify(userData)
-        )}`
-      );
+      res.redirect(clientUrl);
     } else {
-      res.json({
-        success: true,
-        token: tokens.accessToken,
-        user: userData,
-      });
+      res.json({ success: true, message: "Logged in successfully" });
     }
   }
 );
 
+// @ts-ignore
 router.get("/twitter", passport.authenticate("twitter-login", {
   scope: ["tweet.read", "users.read", "offline.access"],
-  session: false
+  session: false,
+  state: false
 }));
 
 router.get(
   "/twitter/callback",
+  // @ts-ignore
   passport.authenticate("twitter-login", {
     failureRedirect: "/login",
     session: false,
+    state: false
   }),
   async (req, res) => {
     const user = req.user as {
@@ -116,24 +117,17 @@ router.get(
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    const userData = user;
     const origins = (process.env.FRONTEND_ORIGINS || '')
       .split(',')
       .map((o) => o.trim())
       .filter(Boolean);
-    const clientUrl = origins[0];
+    const clientUrl = process.env.CLIENT_URL || origins[0];
+
+    // REDIRECT TO FRONTEND (Secure Cookie Handoff)
     if (clientUrl) {
-      res.redirect(
-        `${clientUrl}/?token=${tokens.accessToken}&user=${encodeURIComponent(
-          JSON.stringify(userData)
-        )}`
-      );
+      res.redirect(clientUrl);
     } else {
-      res.json({
-        success: true,
-        token: tokens.accessToken,
-        user: userData,
-      });
+      res.json({ success: true, message: "Logged in successfully" });
     }
   }
 );

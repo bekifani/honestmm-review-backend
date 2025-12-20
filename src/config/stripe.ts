@@ -13,6 +13,7 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 export const SUBSCRIPTION_PLANS = {
   basic: {
     name: "Basic",
+    priceId: process.env.BASIC_PRICE_ID || "price_1Sg49YLpI5TdrxfFaAbDZHrk",
     maxFileAnalyses: 10,
     maxChatMessages: 50,
     features: [
@@ -24,6 +25,7 @@ export const SUBSCRIPTION_PLANS = {
   },
   pro: {
     name: "Pro",
+    priceId: process.env.PRO_PRICE_ID || "price_1Sg4K5LpI5TdrxfFDQscX99Q",
     maxFileAnalyses: 50,
     maxChatMessages: 300,
     features: [
@@ -36,6 +38,7 @@ export const SUBSCRIPTION_PLANS = {
   },
   premium: {
     name: "Premium",
+    priceId: process.env.PREMIUM_PRICE_ID || "price_1Sg4KpLpI5TdrxfF1kBiqCGK",
     maxFileAnalyses: -1, // Unlimited
     maxChatMessages: -1, // Unlimited
     features: [
