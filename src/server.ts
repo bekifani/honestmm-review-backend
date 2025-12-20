@@ -16,6 +16,7 @@ import prisma from "./config/prisma";
 import swaggerOptions from "./config/swagger";
 import credentials from "./middleware/credentials";
 import { globalLimiter } from "./middleware/rateLimiter";
+import { handleWebhook } from "./controllers/subscriptionController";
 import {
   jwtStrategy,
   telegramStrategy,
@@ -65,6 +66,13 @@ app.use(
   })
 );
 
+// Stripe webhook MUST be mounted BEFORE any body parsers to preserve the raw body
+app.post(
+  "/api/subscription/webhook",
+  express.raw({ type: "application/json" }),
+  handleWebhook
+);
+
 // parse json request body
 app.use(express.json());
 
@@ -105,8 +113,8 @@ app.use("/public", express.static(path.join(__dirname, "public")));
 app.use(passport.initialize());
 passport.use("jwt", jwtStrategy);
 passport.use("telegram-login", telegramStrategy);
-passport.use('google-login', googleStrategy);
-passport.use('twitter-login', twitterStrategy);
+passport.use("google-login", googleStrategy);
+passport.use("twitter-login", twitterStrategy);
 
 // Swagger setup
 const swaggerSpec = swaggerJsdoc(swaggerOptions);
@@ -152,7 +160,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
     });
     return res.status(400).json({
       error: "Invalid JSON payload",
-      message: err.message
+      message: err.message,
     });
   }
   next(err);
