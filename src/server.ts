@@ -4,7 +4,7 @@ dotenv.config();
 import path from "path";
 import cors from "cors";
 import helmet from "helmet";
-import express, { type Request, type Response, type NextFunction} from "express";
+import express, { type Request, type Response, type NextFunction } from "express";
 import passport from "passport";
 import { createServer } from "http";
 import compression from "compression";
@@ -98,6 +98,7 @@ const corsOptions = {
       callback(new Error("Not allowed by CORS"));
     }
   },
+  credentials: true, // Allow cookies
   optionsSuccessStatus: 200,
 };
 

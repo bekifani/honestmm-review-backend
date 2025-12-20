@@ -101,6 +101,12 @@ export const getAllFiles = async (req: Request, res: Response) => {
     const files = await prisma.file.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
+      include: {
+        reviews: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
     });
     res.json(files);
   } catch (error) {
