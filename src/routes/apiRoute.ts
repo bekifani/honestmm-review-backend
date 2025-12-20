@@ -1,7 +1,7 @@
 import express from "express";
 import { requireAuth } from "../middleware/auth";
 import upload from "../config/multer";
-import { saveChat, getChats } from "../controllers/chatController";
+import { saveChat, getChats, askAI, clearChatContext } from "../controllers/chatController";
 import {
   uploadFile,
   getFile,
@@ -30,6 +30,8 @@ router.post("/file/:fileId/analyze", checkFileAnalysisLimit, analyzeFile); // AI
 // Chat Routes
 router.post("/chat", checkChatMessageLimit, saveChat);
 router.get("/chat/:fileId", getChats);
+router.post("/chat/ask", checkChatMessageLimit, askAI);
+router.post("/chat/clear", clearChatContext);
 
 // Review Routes
 router.post("/review", saveReview);
