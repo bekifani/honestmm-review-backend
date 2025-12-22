@@ -10,7 +10,6 @@
     "dev2": "nodemon src/index.ts",
     "start": "ts-node src/server.ts",
     "start:prod": "node dist/server.js",
-    "prebuild": "node src/scripts/copy-public.cjs",
     "build": "tsc",
     "seed": "ts-node prisma/seed.ts",
     "clean": "rm -rf ./dist && rm -rf ./.tsbuildinfo"
