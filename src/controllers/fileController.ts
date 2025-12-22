@@ -26,7 +26,7 @@ export const uploadFile = async (req: Request, res: Response) => {
     // Free plan: limit number of uploaded files (lifetime) when no active subscription
     const subscription = await subscriptionService.getUserSubscription(userId);
     if (!subscription || subscription.status !== "active") {
-      const FREE_FILE_UPLOADS = Number(process.env.FREE_FILE_UPLOADS ?? 3);
+      const FREE_FILE_UPLOADS = Number(process.env.FREE_FILE_UPLOADS ?? 2);
       if (FREE_FILE_UPLOADS > 0) {
         const usedUploads = await prisma.usageLog.count({
           where: { userId, usageType: "file_upload" },
@@ -43,6 +43,7 @@ export const uploadFile = async (req: Request, res: Response) => {
     }
 
     const { originalname, mimetype, size, buffer } = req.file;
+    const { workspaceId } = req.body;
     const filepath = await uploader(req, req.file);
 
     // Extract text from file
@@ -72,6 +73,7 @@ export const uploadFile = async (req: Request, res: Response) => {
         filesize: size,
         filepath: filepath,
         extractedText: extractedText || null,
+        workspaceId: workspaceId ? Number(workspaceId) : null,
       },
     });
 
@@ -127,8 +129,18 @@ export const getAllFiles = async (req: Request, res: Response) => {
     const userId = (req.user as any)?.id;
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
+    const { workspaceId } = req.query;
+    const whereClause: any = { userId };
+
+    // Explicitly check for 'undefined' string or empty string to avoid filtering if not intended
+    // But if we want to filter by "No Workspace" (null), client should send specific flag?
+    // For now, if workspaceId is provided, filter by it.
+    if (workspaceId && workspaceId !== 'all') {
+      whereClause.workspaceId = Number(workspaceId);
+    }
+
     const files = await prisma.file.findMany({
-      where: { userId },
+      where: whereClause,
       orderBy: { createdAt: "desc" },
       include: {
         reviews: {
@@ -184,6 +196,11 @@ export const analyzeFile = async (req: Request, res: Response) => {
       metrics: scoringResult.metrics,
       flags: scoringResult.flags,
       recommendations: scoringResult.recommendations,
+      grade: scoringResult.grade,
+      gradeDescription: scoringResult.gradeDescription,
+      findings: scoringResult.findings,
+      tierInfo: scoringResult.tierInfo,
+      extractedFacts: extractedFacts,
     });
 
     // Track usage
