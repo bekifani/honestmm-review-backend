@@ -13,6 +13,11 @@ import {
   getReviewsByFileId,
 } from "../controllers/reviewController";
 import {
+  createWorkspace,
+  getWorkspaces,
+  deleteWorkspace,
+} from "../controllers/workspaceController";
+import {
   checkFileAnalysisLimit,
   checkChatMessageLimit,
 } from "../middleware/usageLimit";
@@ -35,7 +40,12 @@ router.post("/chat/clear", clearChatContext);
 
 // Review Routes
 router.post("/review", saveReview);
-router.get("/review/:fileId", getReviewsByFileId);
+router.get("/review/file/:fileId", getReviewsByFileId);
+
+// Workspace Routes
+router.post("/workspace", createWorkspace);
+router.get("/workspaces", getWorkspaces);
+router.delete("/workspace/:id", deleteWorkspace);
 
 /**
  * @swagger

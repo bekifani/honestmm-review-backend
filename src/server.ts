@@ -26,6 +26,7 @@ import {
 import authRoute from "./routes/authRoute";
 import apiRoute from "./routes/apiRoute";
 import subscriptionRoutes from "./routes/subscriptionRoutes";
+import shareRoute from "./routes/shareRoute";
 
 import websocketService from "./services/websocketService";
 
@@ -110,8 +111,22 @@ app.use(cookieParser());
 // Expose build-time public assets for frontend access (e.g., /public/globx_card.svg)
 app.use("/public", express.static(path.join(__dirname, "public")));
 
+// Session configuration (Required for Twitter OAuth 2.0 PKCE)
+import session from "express-session";
+app.use(session({
+  secret: process.env.SESSION_SECRET || 'super_secret_session_key',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    secure: !isDev, // Secure in production
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 1 day
+  }
+}));
+
 // jwt authentication
 app.use(passport.initialize());
+// app.use(passport.session()); // Not strictly needed if we don't serialize users, but good for completeness if needed later
 passport.use("jwt", jwtStrategy);
 passport.use("telegram-login", telegramStrategy);
 passport.use("google-login", googleStrategy);
@@ -142,6 +157,7 @@ app.get("/api", (req, res) => res.send("Backend is running"));
 
 app.use("/api/auth", authRoute);
 app.use("/api/subscription", subscriptionRoutes);
+app.use("/api/share", shareRoute);
 app.use("/api", apiRoute);
 // Serve uploads with relaxed Cross-Origin-Resource-Policy so the frontend (different origin) can embed images
 app.use(

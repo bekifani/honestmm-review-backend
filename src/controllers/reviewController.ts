@@ -75,6 +75,7 @@ export const getReviewsByFileId = async (req: Request, res: Response) => {
 
         const reviews = await prisma.review.findMany({
             where: { fileId },
+            include: { file: { select: { filename: true } } },
             orderBy: { createdAt: 'desc' }
         });
         res.json(reviews);

@@ -6,6 +6,11 @@ interface ScoreData {
   metrics: ScoringResult["metrics"];
   flags: string[];
   recommendations: string[];
+  grade: string;
+  gradeDescription: string;
+  findings: ScoringResult["findings"];
+  tierInfo: ScoringResult["tierInfo"];
+  extractedFacts?: any;
 }
 
 export async function saveScore(fileId: number, scoreData: ScoreData) {

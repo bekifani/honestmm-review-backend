@@ -33,8 +33,8 @@ const twitterOptions = {
   callbackURL: process.env.TWITTER_CALLBACK_URL as string,
   clientType: 'confidential' as const,
   passReqToCallback: true as true,
-  pkce: true, // Required for public clients, good for security
-  skipState: true, // Rely on PKCE or stateless if session is disabled
+  pkce: true, // Re-enabled for security (requires session)
+  state: true, // Re-enabled
 };
 
 const jwtVerify = async (payload: any, done: any) => {

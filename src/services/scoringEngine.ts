@@ -79,6 +79,10 @@ interface MetricsData {
       optimalRanges: Record<string, number>;
     };
   };
+  redFlags?: {
+    critical?: { condition: string; description: string }[];
+    major?: { condition: string; description: string }[];
+  };
 }
 
 const metrics = metricsData as MetricsData;
@@ -201,11 +205,11 @@ export class ScoringEngine {
       recommendation,
       metric,
     };
-    
+
     if (component !== undefined) {
       finding.component = component;
     }
-    
+
     return finding;
   }
 
@@ -243,8 +247,11 @@ export class ScoringEngine {
       exchangeName: facts.exchange,
     };
 
-    // Generate findings based on facts
+    // Generate findings based on facts (legacy manual check)
     this.generateFindings(facts, fdvTierInfo.tier, exchangeTierInfo.tier, result);
+
+    // Process Red Flags from JSON config
+    this.processRedFlags(facts, result);
 
     let totalAchieved = 0;
     let totalPossible = 0;
@@ -280,8 +287,8 @@ export class ScoringEngine {
           const relevantTier = metric.fdvDependent
             ? fdvTierInfo.tier
             : metric.exchangeDependent
-            ? exchangeTierInfo.tier
-            : null;
+              ? exchangeTierInfo.tier
+              : null;
 
           for (const rule of component.scoring) {
             if (rule.ranges && rule.tier) {
@@ -474,6 +481,52 @@ export class ScoringEngine {
 
     console.log("Scoring result:", result);
     return result;
+  }
+
+  private processRedFlags(facts: any, result: ScoringResult): void {
+    if (!metrics.redFlags) return;
+
+    // Process Critical Red Flags
+    if (metrics.redFlags.critical) {
+      for (const flag of metrics.redFlags.critical) {
+        if (this.evaluateCondition(flag.condition, facts)) {
+          result.findings.push(
+            this.createFinding(
+              "Critical",
+              "Critical Red Flag",
+              "Critical Issue Detected",
+              flag.description,
+              "Immediate attention required. This term is highly non-standard.",
+              "redFlag",
+              "critical"
+            )
+          );
+          // Also add to flags list for legacy support
+          result.flags.push(flag.description);
+        }
+      }
+    }
+
+    // Process Major Red Flags
+    if (metrics.redFlags.major) {
+      for (const flag of metrics.redFlags.major) {
+        if (this.evaluateCondition(flag.condition, facts)) {
+          result.findings.push(
+            this.createFinding(
+              "High",
+              "Major Red Flag",
+              "Major Issue Detected",
+              flag.description,
+              "Strongly recommended to negotiate this term.",
+              "redFlag",
+              "major"
+            )
+          );
+          // Also add to flags list for legacy support
+          result.flags.push(flag.description);
+        }
+      }
+    }
   }
 
   private generateFindings(
