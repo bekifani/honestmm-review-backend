@@ -231,6 +231,43 @@ export const getCurrentSubscription = async (req: Request, res: Response) => {
 };
 
 /**
+ * Track Dedicated Support (Telegram) click
+ */
+export const trackSupportClick = async (req: Request, res: Response) => {
+  try {
+    const userId = (req.user as any)?.id;
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const { fileId } = req.body;
+
+    // Check usage limit for chat_message (repurposed for Support)
+    const usageCheck = await subscriptionService.checkUsageLimit(userId, "chat_message");
+
+    if (!usageCheck.allowed) {
+      return res.status(403).json({
+        error: "Support query limit reached",
+        message: "You have reached your monthly dedicated support query limit. Please upgrade your plan.",
+        limit: usageCheck.limit,
+        remaining: usageCheck.remaining,
+      });
+    }
+
+    // Track usage
+    await subscriptionService.trackUsage(userId, "chat_message", fileId ? Number(fileId) : undefined, undefined, {
+      type: "telegram_click",
+      userAgent: req.headers["user-agent"],
+    });
+
+    res.json({ success: true, remaining: usageCheck.remaining - 1 });
+  } catch (error) {
+    console.error("Track support click error:", error);
+    res.status(500).json({ error: "Failed to track support usage" });
+  }
+};
+
+/**
  * Cancel subscription
  */
 export const cancelSubscription = async (req: Request, res: Response) => {

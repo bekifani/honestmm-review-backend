@@ -13,8 +13,8 @@ export const SUBSCRIPTION_PLANS = {
     name: "QuickScan",
     priceId: process.env.TIER1_PRICE_ID || "price_quickscan_placeholder",
     mode: "payment" as const,
-    maxFileAnalyses: 5,
-    maxChatMessages: 50,
+    maxFileAnalyses: 3,
+    maxChatMessages: 10,
     features: [
       "Manual Contract analysis",
       "Risk assessment report",
@@ -28,8 +28,8 @@ export const SUBSCRIPTION_PLANS = {
     name: "Professional Review",
     priceId: process.env.TIER2_PRICE_ID || "price_professional_placeholder",
     mode: "payment" as const,
-    maxFileAnalyses: 20,
-    maxChatMessages: 200,
+    maxFileAnalyses: 10,
+    maxChatMessages: 20,
     features: [
       "Everything in QuickScan",
       "3 manual reviews by experts",
@@ -43,8 +43,8 @@ export const SUBSCRIPTION_PLANS = {
     name: "Strategic Package",
     priceId: process.env.TIER3_PRICE_ID || "price_strategic_placeholder",
     mode: "payment" as const,
-    maxFileAnalyses: 50,
-    maxChatMessages: 500,
+    maxFileAnalyses: -1,
+    maxChatMessages: -1,
     features: [
       "Everything in Professional Review",
       "Bidding process (3-5 MMs)",

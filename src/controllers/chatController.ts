@@ -31,9 +31,11 @@ export const saveChat = async (req: Request, res: Response) => {
         const chat = await prisma.chatLog.create({ data: chatData });
 
         // Track usage
+        /*
         await subscriptionService.trackUsage(userId, "chat_message", Number(fileId), chat.id, {
             question: question.substring(0, 100), // Store first 100 chars for reference
         });
+        */
 
         res.status(201).json(chat);
     } catch (error) {
@@ -98,6 +100,7 @@ export const askAI = async (req: Request, res: Response) => {
         const result = await chatService.handleChatQuestion(Number(fileId), question, sessionId || "default", userId);
 
         // Track usage
+        /*
         await subscriptionService.trackUsage(
             userId,
             "chat_message",
@@ -105,6 +108,7 @@ export const askAI = async (req: Request, res: Response) => {
             result.chatLogId,
             { question: question.substring(0, 100) }
         );
+        */
 
         return res.json({
             answer: result.answer,

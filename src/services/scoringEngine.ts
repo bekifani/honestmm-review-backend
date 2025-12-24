@@ -479,6 +479,14 @@ export class ScoringEngine {
       }
     }
 
+    // Aggregate unique recommendations from all findings
+    const collectedRecommendations = result.findings
+      .map(f => f.recommendation)
+      .filter(r => r && r.trim().length > 0);
+
+    // Merge with any existing recommendations and ensure uniqueness
+    result.recommendations = Array.from(new Set([...result.recommendations, ...collectedRecommendations]));
+
     console.log("Scoring result:", result);
     return result;
   }

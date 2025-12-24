@@ -8,6 +8,7 @@ import {
   handleWebhook,
   getUsageStats,
   verifyCheckoutSession,
+  trackSupportClick,
 } from "../controllers/subscriptionController";
 import { requireAuth } from "../middleware/auth";
 
@@ -26,5 +27,6 @@ router.get("/current", requireAuth, getCurrentSubscription);
 router.post("/cancel", requireAuth, cancelSubscription);
 router.post("/billing-portal", requireAuth, createBillingPortalSession);
 router.get("/usage", requireAuth, getUsageStats);
+router.post("/track-support", requireAuth, trackSupportClick);
 
 export default router;

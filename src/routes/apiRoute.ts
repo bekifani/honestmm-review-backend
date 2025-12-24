@@ -33,9 +33,9 @@ router.get("/files", getAllFiles); // Additional helper
 router.post("/file/:fileId/analyze", checkFileAnalysisLimit, analyzeFile); // AI Analysis with usage limit
 
 // Chat Routes
-router.post("/chat", checkChatMessageLimit, saveChat);
+router.post("/chat", /* checkChatMessageLimit, */ saveChat);
 router.get("/chat/:fileId", getChats);
-router.post("/chat/ask", checkChatMessageLimit, askAI);
+router.post("/chat/ask", /* checkChatMessageLimit, */ askAI);
 router.post("/chat/clear", clearChatContext);
 
 // Review Routes
