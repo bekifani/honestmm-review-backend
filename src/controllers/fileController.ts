@@ -26,7 +26,7 @@ export const uploadFile = async (req: Request, res: Response) => {
     // Free plan: limit number of uploaded files (lifetime) when no active subscription
     const subscription = await subscriptionService.getUserSubscription(userId);
     if (!subscription || subscription.status !== "active") {
-      const FREE_FILE_UPLOADS = Number(process.env.FREE_FILE_UPLOADS ?? 2);
+      const FREE_FILE_UPLOADS = Number(process.env.FREE_FILE_UPLOADS ?? 4);
       if (FREE_FILE_UPLOADS > 0) {
         const usedUploads = await prisma.usageLog.count({
           where: { userId, usageType: "file_upload" },

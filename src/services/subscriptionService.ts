@@ -367,7 +367,7 @@ export class SubscriptionService {
 
     return {
       ...subscription,
-      planName: planConfig ? planConfig.name : "Unknown Plan",
+      planName: planConfig ? planConfig.name : (subscription.plan || "Free Plan"),
       features: planConfig ? planConfig.features : [],
       fileAnalysesRemaining:
         subscription.maxFileAnalyses === -1

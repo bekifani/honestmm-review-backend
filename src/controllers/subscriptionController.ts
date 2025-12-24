@@ -54,16 +54,54 @@ export const verifyCheckoutSession = async (req: Request, res: Response) => {
       return res.status(403).json({ error: "Session does not belong to this user" });
     }
 
-    // Validate subscription on session
+    // Handle both subscription and one-time payment modes
     const subscriptionId = session.subscription as string | null;
-    if (!subscriptionId) {
-      return res.status(400).json({ error: "Session has no subscription" });
-    }
+    const paymentIntentId = session.payment_intent as string | null;
 
-    const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
-    const firstItem = stripeSub.items.data[0];
-    const priceId = firstItem?.price?.id as string | undefined;
-    const productId = firstItem?.price?.product as string | undefined;
+    let stripeSub: any = null;
+    let priceId: string | undefined;
+    let productId: string | undefined;
+    let currentPeriodStart: Date;
+    let currentPeriodEnd: Date;
+
+    if (subscriptionId) {
+      // Recurring subscription (tier4)
+      stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+      const firstItem = stripeSub.items.data[0];
+      priceId = firstItem?.price?.id as string | undefined;
+      productId = firstItem?.price?.product as string | undefined;
+
+      currentPeriodStart = new Date(((stripeSub as any).current_period_start || 0) * 1000);
+      currentPeriodEnd = new Date(((stripeSub as any).current_period_end || 0) * 1000);
+
+      // Fix 1970 date issue
+      if (currentPeriodEnd.getFullYear() === 1970) {
+        currentPeriodStart = new Date();
+        currentPeriodEnd = new Date();
+        currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
+      }
+    } else if (paymentIntentId) {
+      // One-time payment (tier1-3)
+      // Retrieve full session to get line items
+      const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+        expand: ["line_items"],
+      });
+
+      const firstItem = fullSession.line_items?.data[0];
+      if (!firstItem || !firstItem.price) {
+        return res.status(400).json({ error: "No line items found in session" });
+      }
+
+      priceId = firstItem.price.id;
+      productId = firstItem.price.product as string;
+
+      // Grant 30 days access for one-time payment
+      currentPeriodStart = new Date();
+      currentPeriodEnd = new Date();
+      currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
+    } else {
+      return res.status(400).json({ error: "Session has no subscription or payment" });
+    }
 
     // Resolve plan from metadata or price id mapping
     let plan = (session.metadata?.plan as keyof typeof SUBSCRIPTION_PLANS | undefined) || undefined;
@@ -79,55 +117,41 @@ export const verifyCheckoutSession = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Unable to resolve plan from session" });
     }
 
-    const now = new Date();
-    let currentPeriodStart = new Date(((stripeSub as any).current_period_start || 0) * 1000);
-    let currentPeriodEnd = new Date(((stripeSub as any).current_period_end || 0) * 1000);
-
-    // Fix 1970 date issue: if dates are invalid (epoch 0), set defaults
-    if (currentPeriodEnd.getFullYear() === 1970) {
-      console.warn(`Invalid Stripe period for ${stripeSub.id}, defaulting to now + 30 days`);
-      currentPeriodStart = new Date();
-      currentPeriodEnd = new Date();
-      currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
-    }
-
-    // Idempotent create/update
-    const existingByStripe = await prisma.subscription.findUnique({ where: { stripeSubscriptionId: stripeSub.id } });
     const planCfg = SUBSCRIPTION_PLANS[plan];
 
-    if (!existingByStripe) {
-      const existingByUser = await prisma.subscription.findUnique({ where: { userId } });
-      if (existingByUser) {
-        await prisma.subscription.update({
-          where: { userId },
-          data: {
-            stripeSubscriptionId: stripeSub.id,
-            stripePriceId: priceId || existingByUser.stripePriceId,
-            stripeProductId: productId || existingByUser.stripeProductId,
-            plan: plan as string,
-            status: stripeSub.status,
-            currentPeriodStart,
-            currentPeriodEnd,
-            maxFileAnalyses: planCfg.maxFileAnalyses,
-            maxChatMessages: planCfg.maxChatMessages,
-            usageResetAt: currentPeriodEnd,
-            cancelAtPeriodEnd: false,
-          },
-        });
-      } else {
-        await subscriptionService.createSubscription(
-          userId,
-          stripeSub.id,
-          priceId || "",
-          productId || "",
-          plan as any,
+    // Update or create subscription record
+    const existingByUser = await prisma.subscription.findUnique({ where: { userId } });
+
+    if (existingByUser) {
+      await prisma.subscription.update({
+        where: { userId },
+        data: {
+          stripeSubscriptionId: subscriptionId || paymentIntentId || session.id,
+          stripePriceId: priceId || existingByUser.stripePriceId,
+          stripeProductId: productId || existingByUser.stripeProductId,
+          plan: plan as string,
+          status: "active",
           currentPeriodStart,
-          currentPeriodEnd
-        );
-      }
+          currentPeriodEnd,
+          maxFileAnalyses: planCfg.maxFileAnalyses,
+          maxChatMessages: planCfg.maxChatMessages,
+          usageResetAt: currentPeriodEnd,
+          cancelAtPeriodEnd: false,
+        },
+      });
+    } else {
+      await subscriptionService.createSubscription(
+        userId,
+        subscriptionId || paymentIntentId || session.id,
+        priceId || "",
+        productId || "",
+        plan as any,
+        currentPeriodStart,
+        currentPeriodEnd
+      );
     }
 
-    return res.json({ verified: true, status: stripeSub.status, plan, stripeSubscriptionId: stripeSub.id });
+    return res.json({ verified: true, status: "active", plan, sessionId: session.id });
   } catch (error) {
     console.error("Verify checkout session error:", error);
     return res.status(500).json({ error: "Failed to verify session" });
@@ -158,8 +182,8 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Invalid plan" });
     }
 
-    const successUrl = `${process.env.CLIENT_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${process.env.CLIENT_URL}/subscription/cancel`;
+    const successUrl = `${process.env.CLIENT_URL}/?session_id={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${process.env.CLIENT_URL}/solutions`;
 
     // Determine mode from plan config (default to subscription for safety)
     const mode = (planConfig as any).mode || "subscription";
