@@ -16,12 +16,8 @@ const router = express.Router();
 // Public routes
 router.get("/plans", getPlans);
 
-// Webhook route (must be before express.json() middleware)
-// router.post(
-//   "/webhook",
-//   express.raw({ type: "application/json" }),
-//   handleWebhook
-// );
+// Webhook route (must be public)
+router.post("/webhook", handleWebhook);
 
 // Protected routes (require authentication)
 router.post("/checkout", requireAuth, createCheckoutSession);

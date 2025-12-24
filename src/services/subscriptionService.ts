@@ -44,7 +44,8 @@ export class SubscriptionService {
     plan: PlanType,
     stripePriceId: string,
     successUrl: string,
-    cancelUrl: string
+    cancelUrl: string,
+    mode: Stripe.Checkout.Session.Mode = "subscription"
   ): Promise<Stripe.Checkout.Session> {
     const customerId = await this.getOrCreateCustomer(userId, email, name);
 
@@ -57,7 +58,7 @@ export class SubscriptionService {
           quantity: 1,
         },
       ],
-      mode: "subscription",
+      mode: mode,
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
@@ -81,11 +82,24 @@ export class SubscriptionService {
     currentPeriodStart: Date,
     currentPeriodEnd: Date
   ) {
-    const planConfig = SUBSCRIPTION_PLANS[plan];
+    const planConfig = SUBSCRIPTION_PLANS[plan] || { maxFileAnalyses: 0, maxChatMessages: 0 };
 
-    return await prisma.subscription.create({
-      data: {
+    return await prisma.subscription.upsert({
+      where: { userId },
+      create: {
         userId,
+        stripeSubscriptionId,
+        stripePriceId,
+        stripeProductId,
+        plan,
+        status: "active",
+        currentPeriodStart,
+        currentPeriodEnd,
+        maxFileAnalyses: planConfig.maxFileAnalyses,
+        maxChatMessages: planConfig.maxChatMessages,
+        usageResetAt: currentPeriodEnd,
+      },
+      update: {
         stripeSubscriptionId,
         stripePriceId,
         stripeProductId,
@@ -166,6 +180,16 @@ export class SubscriptionService {
     const subscription = await prisma.subscription.findUnique({
       where: { userId },
     });
+
+    // Auto-repair logic: if date is 1970, fix it immediately to prevent infinite reset loops
+    if (subscription && subscription.status === "active" && subscription.currentPeriodEnd.getFullYear() === 1970) {
+      console.warn(`Detected 1970 date for user ${userId}, auto-repairing...`);
+      const repairedSub = await this.autoRepairSubscription(userId, subscription.stripeSubscriptionId);
+      if (repairedSub) {
+        // Use repaired subscription for checks
+        return this.calculateUsageLimit(repairedSub, usageType);
+      }
+    }
 
     // No active subscription -> apply FREE plan limits using UsageLog counts (lifetime)
     if (!subscription || subscription.status !== "active") {
@@ -318,12 +342,33 @@ export class SubscriptionService {
       return null;
     }
 
+    // Auto-repair view: if date is 1970, return a temporary fixed view (or repair it)
+    if (subscription.status === "active" && subscription.currentPeriodEnd.getFullYear() === 1970) {
+      const repairedSub = await this.autoRepairSubscription(userId, subscription.stripeSubscriptionId);
+      if (repairedSub) {
+        const planConfig = SUBSCRIPTION_PLANS[repairedSub.plan as PlanType];
+        return {
+          ...repairedSub,
+          planName: planConfig.name,
+          features: planConfig.features,
+          fileAnalysesRemaining:
+            repairedSub.maxFileAnalyses === -1
+              ? -1
+              : repairedSub.maxFileAnalyses - repairedSub.usedFileAnalyses,
+          chatMessagesRemaining:
+            repairedSub.maxChatMessages === -1
+              ? -1
+              : repairedSub.maxChatMessages - repairedSub.usedChatMessages,
+        };
+      }
+    }
+
     const planConfig = SUBSCRIPTION_PLANS[subscription.plan as PlanType];
 
     return {
       ...subscription,
-      planName: planConfig.name,
-      features: planConfig.features,
+      planName: planConfig ? planConfig.name : "Unknown Plan",
+      features: planConfig ? planConfig.features : [],
       fileAnalysesRemaining:
         subscription.maxFileAnalyses === -1
           ? -1
@@ -354,5 +399,49 @@ export class SubscriptionService {
     });
 
     return session;
+  }
+
+  /**
+   * Auto-repair subscription with invalid 1970 date
+   */
+  async autoRepairSubscription(userId: number, stripeSubscriptionId: string) {
+    try {
+      // 1. Try to fetch from Stripe
+      const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+      let currentPeriodEnd = new Date(((stripeSub as any).current_period_end || 0) * 1000);
+      let currentPeriodStart = new Date(((stripeSub as any).current_period_start || 0) * 1000);
+
+      // 2. If Stripe also returns 1970 (e.g. error or test data), force a valid date
+      if (currentPeriodEnd.getFullYear() === 1970) {
+        currentPeriodStart = new Date();
+        currentPeriodEnd = new Date();
+        currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
+      }
+
+      // 3. Update DB
+      return await prisma.subscription.update({
+        where: { userId },
+        data: {
+          currentPeriodStart,
+          currentPeriodEnd,
+          usageResetAt: currentPeriodEnd,
+        },
+      });
+    } catch (error) {
+      console.error("Auto-repair failed:", error);
+      // Fallback: just update DB with +30 days
+      const now = new Date();
+      const nextMonth = new Date();
+      nextMonth.setDate(nextMonth.getDate() + 30);
+
+      return await prisma.subscription.update({
+        where: { userId },
+        data: {
+          currentPeriodStart: now,
+          currentPeriodEnd: nextMonth,
+          usageResetAt: nextMonth,
+        },
+      });
+    }
   }
 }

@@ -7,45 +7,70 @@ if (!process.env.STRIPE_SECRET_KEY) {
 export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 // Subscription plan configurations
+// Subscription plan configurations
 export const SUBSCRIPTION_PLANS = {
-  basic: {
-    name: "Basic",
-    priceId: process.env.BASIC_PRICE_ID || "price_1Sfw1zLmn5wXUd0g5B4JlI2N",
-    maxFileAnalyses: 10,
+  tier1: {
+    name: "QuickScan",
+    priceId: process.env.TIER1_PRICE_ID || "price_quickscan_placeholder",
+    mode: "payment" as const,
+    maxFileAnalyses: 5,
     maxChatMessages: 50,
     features: [
-      "10 file analyses per month",
-      "50 chat messages per month",
-      "Basic AI analysis",
-      "Email support",
+      "Manual Contract analysis",
+      "Risk assessment report",
+      "Red flag identification",
+      "Comparison vs. industry standards",
+      "Written recommendations & advice",
+      "48-hour turnaround",
     ],
   },
-  pro: {
-    name: "Pro",
-    priceId: process.env.PRO_PRICE_ID || "price_1Sfw3sLmn5wXUd0gR7WbJTkq",
-    maxFileAnalyses: 50,
-    maxChatMessages: 300,
+  tier2: {
+    name: "Professional Review",
+    priceId: process.env.TIER2_PRICE_ID || "price_professional_placeholder",
+    mode: "payment" as const,
+    maxFileAnalyses: 20,
+    maxChatMessages: 200,
     features: [
-      "50 file analyses per month",
-      "300 chat messages per month",
-      "Advanced AI analysis",
-      "Priority email support",
-      "Export reports",
+      "Everything in QuickScan",
+      "3 manual reviews by experts",
+      "Consultation call",
+      "Negotiation talking points",
+      "Term-by-term recommendations",
+      "Intro to +60 vetted market makers",
     ],
   },
-  premium: {
-    name: "Premium",
-    priceId: process.env.PREMIUM_PRICE_ID || "price_1Sfw4ILmn5wXUd0gvYFSF0Y7",
+  tier3: {
+    name: "Strategic Package",
+    priceId: process.env.TIER3_PRICE_ID || "price_strategic_placeholder",
+    mode: "payment" as const,
+    maxFileAnalyses: 50,
+    maxChatMessages: 500,
+    features: [
+      "Everything in Professional Review",
+      "Bidding process (3-5 MMs)",
+      "Custom liquidity strategy",
+      "Token unlock schedule optimization",
+      "Market maker selection criteria",
+      "Performance KPI framework",
+      "Fee benchmarking report",
+      "Priority Slack/Telegram support",
+    ],
+  },
+  tier4: {
+    name: "Advisory Retainer",
+    priceId: process.env.TIER4_PRICE_ID || "price_advisory_placeholder",
+    mode: "subscription" as const,
     maxFileAnalyses: -1, // Unlimited
     maxChatMessages: -1, // Unlimited
     features: [
-      "Unlimited file analyses",
-      "Unlimited chat messages",
-      "Premium AI analysis",
-      "24/7 priority support",
-      "Export reports",
-      "Custom integrations",
-      "Dedicated account manager",
+      "Dedicated advisors",
+      "Unlimited contract reviews",
+      "Monthly liquidity performance reviews",
+      "Quarterly performance audits",
+      "Intro to full MM ecosystem",
+      "Weekly check-in calls",
+      "Custom trading analytics dashboard",
+      "Post-TGE market oversight",
     ],
   },
 };

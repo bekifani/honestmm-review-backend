@@ -79,8 +79,17 @@ export const verifyCheckoutSession = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Unable to resolve plan from session" });
     }
 
-    const currentPeriodStart = new Date(((stripeSub as any).current_period_start || 0) * 1000);
-    const currentPeriodEnd = new Date(((stripeSub as any).current_period_end || 0) * 1000);
+    const now = new Date();
+    let currentPeriodStart = new Date(((stripeSub as any).current_period_start || 0) * 1000);
+    let currentPeriodEnd = new Date(((stripeSub as any).current_period_end || 0) * 1000);
+
+    // Fix 1970 date issue: if dates are invalid (epoch 0), set defaults
+    if (currentPeriodEnd.getFullYear() === 1970) {
+      console.warn(`Invalid Stripe period for ${stripeSub.id}, defaulting to now + 30 days`);
+      currentPeriodStart = new Date();
+      currentPeriodEnd = new Date();
+      currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
+    }
 
     // Idempotent create/update
     const existingByStripe = await prisma.subscription.findUnique({ where: { stripeSubscriptionId: stripeSub.id } });
@@ -144,12 +153,16 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
       return res.status(400).json({ error: "Plan and price ID are required" });
     }
 
-    if (!SUBSCRIPTION_PLANS[plan as keyof typeof SUBSCRIPTION_PLANS]) {
+    const planConfig = SUBSCRIPTION_PLANS[plan as keyof typeof SUBSCRIPTION_PLANS];
+    if (!planConfig) {
       return res.status(400).json({ error: "Invalid plan" });
     }
 
     const successUrl = `${process.env.CLIENT_URL}/subscription/success?session_id={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${process.env.CLIENT_URL}/subscription/cancel`;
+
+    // Determine mode from plan config (default to subscription for safety)
+    const mode = (planConfig as any).mode || "subscription";
 
     const session = await subscriptionService.createCheckoutSession(
       userId,
@@ -158,7 +171,8 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
       plan,
       stripePriceId,
       successUrl,
-      cancelUrl
+      cancelUrl,
+      mode
     );
 
     res.json({ sessionId: session.id, url: session.url });
@@ -328,26 +342,66 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     return;
   }
 
-  const subscriptionId = session.subscription as string;
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  let subscriptionId: string;
+  let priceId: string;
+  let productId: string;
+  let currentPeriodStart: Date;
+  let currentPeriodEnd: Date;
 
-  const firstItem = subscription.items.data[0];
-  if (!firstItem || !firstItem.price) {
-    console.error("No subscription items found");
-    return;
+  if (session.subscription) {
+    // Recurring Subscription
+    subscriptionId = session.subscription as string;
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+
+    const firstItem = subscription.items.data[0];
+    if (!firstItem || !firstItem.price) {
+      console.error("No subscription items found");
+      return;
+    }
+
+    priceId = firstItem.price.id;
+    productId = firstItem.price.product as string;
+
+    currentPeriodStart = new Date(((subscription as any).current_period_start || 0) * 1000);
+    currentPeriodEnd = new Date(((subscription as any).current_period_end || 0) * 1000);
+
+    // Fix 1970 date issue
+    if (currentPeriodEnd.getFullYear() === 1970) {
+      currentPeriodStart = new Date();
+      currentPeriodEnd = new Date();
+      currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
+    }
+  } else {
+    // One-Time Payment
+    // Retrieve full session to get line items
+    const fullSession = await stripe.checkout.sessions.retrieve(session.id, {
+      expand: ["line_items"],
+    });
+
+    const firstItem = fullSession.line_items?.data[0];
+    if (!firstItem || !firstItem.price) {
+      console.error("No line items found in session");
+      return;
+    }
+
+    priceId = firstItem.price.id;
+    productId = firstItem.price.product as string;
+    // Use Payment Intent or Session ID as the "subscription" ID for DB consistency
+    subscriptionId = (fullSession.payment_intent as string) || fullSession.id;
+
+    currentPeriodStart = new Date();
+    currentPeriodEnd = new Date();
+    currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30); // Grant 30 days access
   }
-
-  const priceId = firstItem.price.id;
-  const productId = firstItem.price.product as string;
 
   await subscriptionService.createSubscription(
     userId,
-    subscription.id,
+    subscriptionId,
     priceId,
     productId,
     plan as any,
-    new Date(((subscription as any).current_period_start || 0) * 1000),
-    new Date(((subscription as any).current_period_end || 0) * 1000)
+    currentPeriodStart,
+    currentPeriodEnd
   );
 
   console.log(`Subscription created for user ${userId}, plan: ${plan}`);
@@ -357,11 +411,22 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
  * Handle subscription updated
  */
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+  // Calculate dates safely
+  let currentPeriodStart = new Date(((subscription as any).current_period_start || 0) * 1000);
+  let currentPeriodEnd = new Date(((subscription as any).current_period_end || 0) * 1000);
+
+  // Fix 1970 date issue
+  if (currentPeriodEnd.getFullYear() === 1970) {
+    currentPeriodStart = new Date();
+    currentPeriodEnd = new Date();
+    currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30);
+  }
+
   await subscriptionService.updateSubscriptionStatus(
     subscription.id,
     subscription.status,
-    new Date(((subscription as any).current_period_start || 0) * 1000),
-    new Date(((subscription as any).current_period_end || 0) * 1000)
+    currentPeriodStart,
+    currentPeriodEnd
   );
 
   console.log(`Subscription ${subscription.id} updated to status: ${subscription.status}`);
