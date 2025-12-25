@@ -133,8 +133,15 @@ export const login = async (req: Request, res: Response) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
+    res.cookie("accessToken", tokens.accessToken, {
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === "development" ? "lax" : "none",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
     const { password: _userPassword, ...userData } = user as any;
-    return res.json({ status: "success", token: tokens.accessToken, user: userData });
+    return res.json({ status: "success", user: userData });
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -258,10 +265,16 @@ export const verifyEmail = async (req: Request, res: Response) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
+    res.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === 'development' ? 'lax' : 'none',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
     const { password: userPassword, ...userData } = user as any;
     return res.json({
       success: true,
-      token: tokens.accessToken,
       user: userData
     });
 
@@ -518,7 +531,14 @@ export const refreshToken = async (req: Request, res: Response) => {
       maxAge: 24 * 60 * 60 * 1000,
     });
 
-    res.send({ user: userData, token: accessToken });
+    res.cookie("accessToken", accessToken, {
+      httpOnly: true,
+      sameSite: process.env.NODE_ENV === "development" ? "lax" : "none",
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 15 * 60 * 1000, // 15 minutes
+    });
+
+    res.send({ user: userData });
   } catch (error) {
     console.log(error);
     res.status(500).json({ error: "Server error" });
@@ -533,6 +553,11 @@ export const handleLogout = async (req: Request, res: Response) => {
 
   await logout(refreshToken);
   res.clearCookie("jwt", {
+    httpOnly: true,
+    sameSite: process.env.NODE_ENV === "development" ? "lax" : "none",
+    secure: process.env.NODE_ENV === "production",
+  });
+  res.clearCookie("accessToken", {
     httpOnly: true,
     sameSite: process.env.NODE_ENV === "development" ? "lax" : "none",
     secure: process.env.NODE_ENV === "production",

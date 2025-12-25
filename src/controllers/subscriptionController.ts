@@ -585,6 +585,7 @@ export const getUsageStats = async (req: Request, res: Response) => {
     res.json({
       hasSubscription: true,
       plan: subscription.plan,
+      planName: subscription.planName,
       status: subscription.status,
       fileAnalyses: {
         used: subscription.usedFileAnalyses,

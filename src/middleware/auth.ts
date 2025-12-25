@@ -33,13 +33,7 @@ export async function requireAuth(
   next: NextFunction
 ) {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ error: "Missing token" });
-    }
-
-    const token = authHeader.split(" ")[1];
+    const token = req.cookies.accessToken;
 
     if (!token) return res.status(401).json({ error: "Missing token" });
 
@@ -50,7 +44,7 @@ export async function requireAuth(
 
     if (!decoded) return res.status(401).json({ error: "Invalid token" });
 
-    const {id, name, email, role} = decoded.userInfo;
+    const { id, name, email, role } = decoded.userInfo;
 
     (req as any).user = {
       id,
