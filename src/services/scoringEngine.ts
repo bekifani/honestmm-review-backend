@@ -142,6 +142,91 @@ export class ScoringEngine {
     }
   }
 
+  private snapToDisplayScore(score: number, max: number): number {
+    const roundedScore = Math.round(score);
+
+    // If it's a percentage (0-100)
+    if (max === 100) {
+      if (roundedScore <= 12) return 13;
+      if (roundedScore >= 85) return 85;
+      return roundedScore;
+    }
+
+    if (max === 25) {
+      if (roundedScore <= 5) return 6;
+      if (roundedScore >= 17) return 17;
+      return roundedScore;
+    }
+
+    if (max === 20) {
+      if (roundedScore <= 4) return 5;
+      if (roundedScore >= 16) return 16;
+      return roundedScore;
+    }
+
+    if (max === 15) {
+      if (roundedScore <= 3) return 4;
+      if (roundedScore >= 10) return 10;
+      return roundedScore;
+    }
+
+    if (max === 10) {
+      if (roundedScore <= 2) return 3;
+      if (roundedScore >= 7) return 7;
+      return roundedScore;
+    }
+
+    if (max === 5) {
+      if (roundedScore <= 2) return 2;
+      return 3;
+    }
+
+    // Fallback for other max values (proportional)
+    if (roundedScore <= 0) return Math.max(1, Math.round(max * 0.15));
+    if (roundedScore >= max) return Math.max(1, Math.floor(max * 0.88));
+    return roundedScore;
+  }
+
+  public redactResult(result: ScoringResult): any {
+    const redacted = JSON.parse(JSON.stringify(result));
+    const REDACTION_MESSAGE = "Upgrade to Pro to unlock detailed findings and strategic advice.";
+
+    // Redact main recommendations
+    if (redacted.recommendations) {
+      redacted.recommendations = redacted.recommendations.map(() => REDACTION_MESSAGE);
+    }
+
+    // Redact main findings
+    if (redacted.findings) {
+      redacted.findings = redacted.findings.map((f: any) => ({
+        ...f,
+        description: REDACTION_MESSAGE,
+        recommendation: REDACTION_MESSAGE,
+      }));
+    }
+
+    // Redact flags
+    if (redacted.flags) {
+      redacted.flags = redacted.flags.map(() => "Potential risk identified (Upgrade to reveal)");
+    }
+
+    // Redact metric-level findings
+    if (redacted.metrics) {
+      for (const metricId in redacted.metrics) {
+        const metric = redacted.metrics[metricId];
+        if (metric.findings) {
+          metric.findings = metric.findings.map((f: any) => ({
+            ...f,
+            description: REDACTION_MESSAGE,
+            recommendation: REDACTION_MESSAGE,
+          }));
+        }
+      }
+    }
+
+    return redacted;
+  }
+
   private getTier(fdv: number | null | undefined): {
     tier: string;
     label: string;
@@ -471,6 +556,21 @@ export class ScoringEngine {
       }
     }
 
+    // --- SCORE SNAPPING (FUZZING) ---
+    // Apply snapping to individual metrics first
+    for (const metricId in result.metrics) {
+      const metric = result.metrics[metricId];
+      if (metric) {
+        // Snap the achieved value
+        metric.achieved = this.snapToDisplayScore(metric.achieved, metric.maxPossible);
+        // Recalculate the percentage score based on snapped achieved value
+        metric.score = metric.maxPossible > 0 ? (metric.achieved / metric.maxPossible) * 100 : 0;
+      }
+    }
+
+    // Snap the total score (max 100)
+    result.totalScore = this.snapToDisplayScore(result.totalScore, 100);
+
     for (const grade of metrics.ratingScale) {
       if (result.totalScore >= grade.min) {
         result.grade = grade.grade;
@@ -487,7 +587,7 @@ export class ScoringEngine {
     // Merge with any existing recommendations and ensure uniqueness
     result.recommendations = Array.from(new Set([...result.recommendations, ...collectedRecommendations]));
 
-    console.log("Scoring result:", result);
+    console.log("Scoring result (post-snapping):", result);
     return result;
   }
 

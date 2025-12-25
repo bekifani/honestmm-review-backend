@@ -1,7 +1,13 @@
 import { Request, Response } from "express";
 import prisma from "../config/prisma";
+import { ScoringEngine } from "../services/scoringEngine";
+import { SubscriptionService } from "../services/subscriptionService";
+
+const scoringEngine = new ScoringEngine();
+const subscriptionService = new SubscriptionService();
 
 export const saveReview = async (req: Request, res: Response) => {
+    // ... existing code ...
     try {
         const userId = (req.user as any)?.id;
         if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -73,12 +79,53 @@ export const getReviewsByFileId = async (req: Request, res: Response) => {
         if (!file) return res.status(404).json({ error: "File not found" });
         if (file.userId !== userId) return res.status(403).json({ error: "Forbidden" });
 
+        const subscription = await subscriptionService.getUserSubscription(userId);
+        const isPro = subscription && subscription.status === "active";
+
         const reviews = await prisma.review.findMany({
             where: { fileId },
             include: { file: { select: { filename: true } } },
             orderBy: { createdAt: 'desc' }
         });
-        res.json(reviews);
+
+        // Redact content for free users
+        const redactedReviews = reviews.map(review => {
+            if (!isPro && review.content) {
+                try {
+                    const contentValue = typeof review.content === 'string' ? JSON.parse(review.content) : review.content;
+
+                    if (contentValue.scoringResult) {
+                        contentValue.scoringResult = scoringEngine.redactResult(contentValue.scoringResult);
+                    } else {
+                        // Raw ScoringResult
+                        const redacted = scoringEngine.redactResult(contentValue);
+                        if (typeof review.content === 'string') {
+                            review.content = JSON.stringify(redacted);
+                        } else {
+                            review.content = redacted;
+                        }
+                        return review;
+                    }
+
+                    if (contentValue.extractedFacts) {
+                        contentValue.extractedFacts = {
+                            message: "Upgrade to Pro to unlock detailed extracted contract terms."
+                        };
+                    }
+
+                    if (typeof review.content === 'string') {
+                        review.content = JSON.stringify(contentValue);
+                    } else {
+                        review.content = contentValue;
+                    }
+                } catch (e) {
+                    console.error("Redaction in getReviewsByFileId failed", e);
+                }
+            }
+            return review;
+        });
+
+        res.json(redactedReviews);
     } catch (err) {
         res.status(500).json({ error: "Server error" });
     }

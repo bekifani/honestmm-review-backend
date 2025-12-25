@@ -139,6 +139,9 @@ export const getAllFiles = async (req: Request, res: Response) => {
       whereClause.workspaceId = Number(workspaceId);
     }
 
+    const subscription = await subscriptionService.getUserSubscription(userId);
+    const isPro = subscription && subscription.status === "active";
+
     const files = await prisma.file.findMany({
       where: whereClause,
       orderBy: { createdAt: "desc" },
@@ -149,7 +152,52 @@ export const getAllFiles = async (req: Request, res: Response) => {
         },
       },
     });
-    res.json(files);
+
+    // Redact analysis content in getAllFiles for free users
+    const redactedFiles = files.map((file: any) => {
+      if (!isPro && file.reviews && file.reviews.length > 0) {
+        const review = file.reviews[0];
+        if (review && review.content) {
+          try {
+            const content = typeof review.content === 'string' ? JSON.parse(review.content) : review.content;
+
+            // Check if it's the wrapped object or the raw scoring result
+            if (content.scoringResult) {
+              content.scoringResult = scoringEngine.redactResult(content.scoringResult);
+            } else {
+              // Usually the 'content' field in review table is the whole scoringResult
+              // or it has been saved as the wrapped object. We try to redact as ScoringResult.
+              // redactResult handles property checks internally.
+              const redactedResult = scoringEngine.redactResult(content);
+
+              if (typeof review.content === 'string') {
+                review.content = JSON.stringify(redactedResult);
+              } else {
+                review.content = redactedResult;
+              }
+              return file;
+            }
+
+            if (content.extractedFacts) {
+              content.extractedFacts = {
+                message: "Upgrade to Pro to unlock detailed extracted contract terms."
+              };
+            }
+
+            if (typeof review.content === 'string') {
+              review.content = JSON.stringify(content);
+            } else {
+              review.content = content;
+            }
+          } catch (e) {
+            console.error("Redaction in getAllFiles failed", e);
+          }
+        }
+      }
+      return file;
+    });
+
+    res.json(redactedFiles);
   } catch (error) {
     res.status(500).json({ error: "Server error" });
   }
@@ -166,6 +214,9 @@ export const analyzeFile = async (req: Request, res: Response) => {
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
+
+    const subscription = await subscriptionService.getUserSubscription(userId);
+    const isPro = subscription && subscription.status === "active";
 
     // Verify file ownership
     const file = await prisma.file.findUnique({
@@ -209,10 +260,22 @@ export const analyzeFile = async (req: Request, res: Response) => {
       score: scoringResult.totalScore,
     });
 
+    // Apply redaction for free users
+    let finalScoringResult = scoringResult;
+    let finalExtractedFacts = extractedFacts;
+
+    if (!isPro) {
+      finalScoringResult = scoringEngine.redactResult(scoringResult);
+      // Redact extracted facts as well
+      finalExtractedFacts = {
+        message: "Upgrade to Pro to unlock detailed extracted contract terms."
+      } as any;
+    }
+
     res.json({
       success: true,
-      extractedFacts,
-      scoringResult,
+      extractedFacts: finalExtractedFacts,
+      scoringResult: finalScoringResult,
     });
   } catch (error) {
     console.error("Analysis error:", error);
