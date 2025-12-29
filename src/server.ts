@@ -27,6 +27,7 @@ import authRoute from "./routes/authRoute";
 import apiRoute from "./routes/apiRoute";
 import subscriptionRoutes from "./routes/subscriptionRoutes";
 import shareRoute from "./routes/shareRoute";
+import voiceRoutes from "./routes/voiceRoutes";
 
 import websocketService from "./services/websocketService";
 
@@ -158,6 +159,7 @@ app.get("/api", (req, res) => res.send("Backend is running"));
 app.use("/api/auth", authRoute);
 app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/share", shareRoute);
+app.use("/api/voice", voiceRoutes);
 app.use("/api", apiRoute);
 // Serve uploads with relaxed Cross-Origin-Resource-Policy so the frontend (different origin) can embed images
 app.use(

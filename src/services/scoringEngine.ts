@@ -200,7 +200,7 @@ export class ScoringEngine {
     if (redacted.findings) {
       redacted.findings = redacted.findings.map((f: any) => ({
         ...f,
-        description: REDACTION_MESSAGE,
+        // description: REDACTION_MESSAGE, // Keep description visible
         recommendation: REDACTION_MESSAGE,
       }));
     }
@@ -217,7 +217,7 @@ export class ScoringEngine {
         if (metric.findings) {
           metric.findings = metric.findings.map((f: any) => ({
             ...f,
-            description: REDACTION_MESSAGE,
+            // description: REDACTION_MESSAGE, // Keep description visible
             recommendation: REDACTION_MESSAGE,
           }));
         }

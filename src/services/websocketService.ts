@@ -2,6 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { Server as HTTPServer } from 'http';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/prisma';
+import { RealtimeRelay } from './realtimeService';
 
 interface AuthenticatedSocket extends Socket {
   userId?: number;
@@ -21,6 +22,7 @@ interface NotificationData {
 class WebSocketService {
   private io: SocketIOServer | null = null;
   private adminSockets = new Map<string, AuthenticatedSocket>();
+  private activeVoiceRelays = new Map<string, RealtimeRelay>();
 
   initialize(httpServer: HTTPServer) {
     this.io = new SocketIOServer(httpServer, {
@@ -35,7 +37,7 @@ class WebSocketService {
 
     this.setupMiddleware();
     this.setupEventHandlers();
-    
+
     console.log('🔌 WebSocket service initialized');
   }
 
@@ -52,28 +54,28 @@ class WebSocketService {
         //   cookies: socket.handshake.headers?.cookie,
         //   query: socket.handshake.query
         // });
-        
+
         // Try multiple sources for the token (handle both direct and proxy scenarios)
-        let token = socket.handshake.auth?.token || 
-                   socket.handshake.headers?.authorization?.replace('Bearer ', '') ||
-                   socket.handshake.query?.token;
-        
+        let token = socket.handshake.auth?.token ||
+          socket.handshake.headers?.authorization?.replace('Bearer ', '') ||
+          socket.handshake.query?.token;
+
         // If no token in auth/headers/query, try to extract from cookies
         if (!token && socket.handshake.headers?.cookie) {
           const cookies = socket.handshake.headers.cookie;
           // console.log('🍪 Parsing cookies:', cookies);
-          
+
           // Try different cookie formats
-          const jwtMatch = cookies.match(/jwt=([^;]+)/) || 
-                          cookies.match(/accessToken=([^;]+)/) ||
-                          cookies.match(/token=([^;]+)/);
-          
+          const jwtMatch = cookies.match(/jwt=([^;]+)/) ||
+            cookies.match(/accessToken=([^;]+)/) ||
+            cookies.match(/token=([^;]+)/);
+
           if (jwtMatch) {
             token = jwtMatch[1];
             // console.log('🍪 Found token in cookie:', token.substring(0, 20) + '...');
           }
         }
-        
+
         if (!token) {
           console.error('❌ No authentication token found in any source');
           return next(new Error('Authentication token required'));
@@ -84,15 +86,15 @@ class WebSocketService {
         // Verify JWT token
         const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET!) as any;
         // console.log('✅ Token decoded successfully:', { userId: decoded.id, userInfo: decoded.userInfo });
-        
+
         // Handle different token structures (some tokens have userInfo nested)
         const userId = decoded.id || decoded.userInfo?.id;
-        
+
         if (!userId) {
           console.error('❌ No user ID found in token');
           return next(new Error('Invalid token structure'));
         }
-        
+
         // Get user from database
         const user = await prisma.user.findUnique({
           where: { id: userId },
@@ -132,9 +134,42 @@ class WebSocketService {
         console.log(`👤 User connected: ${socket.userName}`);
       }
 
+      // Handle Realtime Voice Request
+      socket.on('client:start-realtime', async (data: { fileId: number }) => {
+        console.log(`🎙️ Voice Listen requested by ${socket.userId} for File: ${data.fileId}`);
+
+        // Clean up any existing relay for this socket to avoid duplicates
+        if (this.activeVoiceRelays.has(socket.id)) {
+          this.activeVoiceRelays.get(socket.id)?.disconnect();
+          this.activeVoiceRelays.delete(socket.id);
+        }
+
+        const relay = new RealtimeRelay(socket);
+        if (data.fileId) {
+          relay.setContext(data.fileId);
+        }
+
+        await relay.connect();
+        this.activeVoiceRelays.set(socket.id, relay);
+      });
+
+      // Handle Barge-In Interruption
+      socket.on('client:interrupt', () => {
+        if (this.activeVoiceRelays.has(socket.id)) {
+          this.activeVoiceRelays.get(socket.id)?.interrupt();
+        }
+      });
+
       // Handle disconnection
       socket.on('disconnect', (reason) => {
         console.log(`🔌 User disconnected: ${socket.userId} - Reason: ${reason}`);
+
+        // Cleanup Voice Relay
+        if (this.activeVoiceRelays.has(socket.id)) {
+          console.log(`🧹 Cleaning up Voice Relay for ${socket.userId}`);
+          this.activeVoiceRelays.get(socket.id)?.disconnect();
+          this.activeVoiceRelays.delete(socket.id);
+        }
       });
 
       // Handle connection errors
@@ -171,7 +206,7 @@ class WebSocketService {
     if (!this.io) return;
 
     console.log(`📤 Emitting to user ${userId}: ${notification.type} - ${notification.title}`);
-    
+
     this.io.to(`user-${userId}`).emit('user-notification', {
       ...notification,
       timestamp: new Date()
@@ -196,7 +231,7 @@ class WebSocketService {
     const idx = Math.floor(Math.random() * notificationTemplates.length);
     const template = notificationTemplates[idx];
     if (!template) return;
-    
+
     const notification: NotificationData = {
       type: template.type,
       title: template.title,
@@ -204,7 +239,7 @@ class WebSocketService {
       data: { randomId: Math.random() },
       timestamp: new Date()
     };
-    
+
     this.emitToUser(userId, notification);
   }
 

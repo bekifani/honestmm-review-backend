@@ -8,10 +8,12 @@ import { saveScore } from "../services/scoreService";
 import { ScoringEngine } from "../services/scoringEngine";
 import { AIExtractionService } from "../services/aiExtractionService";
 import { SubscriptionService } from "../services/subscriptionService";
+import { EmbeddingService } from "../services/embeddingService";
 
 const aiService = new AIExtractionService();
 const scoringEngine = new ScoringEngine();
 const subscriptionService = new SubscriptionService();
+const embeddingService = new EmbeddingService();
 
 export const uploadFile = async (req: Request, res: Response) => {
   try {
@@ -76,6 +78,13 @@ export const uploadFile = async (req: Request, res: Response) => {
         workspaceId: workspaceId ? Number(workspaceId) : null,
       },
     });
+
+    // Background task: Vectorize the file for RAG (non-blocking)
+    if (extractedText) {
+      embeddingService.processFile(file.id, extractedText).catch(err => {
+        console.error(`Vectorization failed for file ${file.id}:`, err);
+      });
+    }
 
     // Log usage for free-plan lifetime counting
     await prisma.usageLog.create({

@@ -1,0 +1,223 @@
+{
+  "models": [
+    {
+      "model": "llama-text-embed-v2",
+      "shortDescription": "A high performance dense embedding model optimized for multilingual and cross-lingual text question-answering retrieval with support for long documents (up to 2048 tokens) and dynamic embedding size (Matryoshka Embeddings).",
+      "type": "embed",
+      "vectorType": "dense",
+      "defaultDimension": 1024,
+      "modality": "text",
+      "maxSequenceLength": 2048,
+      "maxBatchSize": 96,
+      "providerName": "NVIDIA",
+      "supportedDimensions": [
+        384,
+        512,
+        768,
+        1024,
+        2048
+      ],
+      "supportedMetrics": [
+        "cosine",
+        "dotproduct"
+      ],
+      "supportedParameters": [
+        {
+          "parameter": "input_type",
+          "type": "one_of",
+          "valueType": "string",
+          "required": true,
+          "allowedValues": [
+            "query",
+            "passage"
+          ]
+        },
+        {
+          "parameter": "truncate",
+          "type": "one_of",
+          "valueType": "string",
+          "required": false,
+          "allowedValues": [
+            "END",
+            "NONE",
+            "START"
+          ],
+          "_default": "END"
+        },
+        {
+          "parameter": "dimension",
+          "type": "one_of",
+          "valueType": "integer",
+          "required": false,
+          "allowedValues": [
+            384,
+            512,
+            768,
+            1024,
+            2048
+          ],
+          "_default": 1024
+        }
+      ]
+    },
+    {
+      "model": "multilingual-e5-large",
+      "shortDescription": "A high-performance dense embedding model trained on a mixture of multilingual datasets. It works well on messy data and short queries expected to return medium-length passages of text (1-2 paragraphs)",
+      "type": "embed",
+      "vectorType": "dense",
+      "defaultDimension": 1024,
+      "modality": "text",
+      "maxSequenceLength": 507,
+      "maxBatchSize": 96,
+      "providerName": "Microsoft",
+      "supportedDimensions": [
+        1024
+      ],
+      "supportedMetrics": [
+        "cosine",
+        "euclidean"
+      ],
+      "supportedParameters": [
+        {
+          "parameter": "input_type",
+          "type": "one_of",
+          "valueType": "string",
+          "required": true,
+          "allowedValues": [
+            "query",
+            "passage"
+          ]
+        },
+        {
+          "parameter": "truncate",
+          "type": "one_of",
+          "valueType": "string",
+          "required": false,
+          "allowedValues": [
+            "END",
+            "NONE"
+          ],
+          "_default": "END"
+        }
+      ]
+    },
+    {
+      "model": "pinecone-sparse-english-v0",
+      "shortDescription": "A sparse embedding model for converting text to sparse vectors for keyword or hybrid semantic/keyword search. Built on the innovations of the DeepImpact architecture.",
+      "type": "embed",
+      "vectorType": "sparse",
+      "modality": "text",
+      "maxSequenceLength": 512,
+      "maxBatchSize": 96,
+      "providerName": "Pinecone",
+      "supportedMetrics": [
+        "dotproduct"
+      ],
+      "supportedParameters": [
+        {
+          "parameter": "input_type",
+          "type": "one_of",
+          "valueType": "string",
+          "required": true,
+          "allowedValues": [
+            "query",
+            "passage"
+          ]
+        },
+        {
+          "parameter": "truncate",
+          "type": "one_of",
+          "valueType": "string",
+          "required": false,
+          "allowedValues": [
+            "END",
+            "NONE"
+          ],
+          "_default": "END"
+        },
+        {
+          "parameter": "return_tokens",
+          "type": "any",
+          "valueType": "boolean",
+          "required": false,
+          "_default": false
+        },
+        {
+          "parameter": "max_tokens_per_sequence",
+          "type": "one_of",
+          "valueType": "integer",
+          "required": false,
+          "allowedValues": [
+            512,
+            2048
+          ],
+          "_default": 512
+        }
+      ]
+    },
+    {
+      "model": "bge-reranker-v2-m3",
+      "shortDescription": "A high-performance, multilingual reranking model that works well on messy data and short queries expected to return medium-length passages of text (1-2 paragraphs)",
+      "type": "rerank",
+      "modality": "text",
+      "maxSequenceLength": 1024,
+      "maxBatchSize": 100,
+      "providerName": "BAAI",
+      "supportedParameters": [
+        {
+          "parameter": "truncate",
+          "type": "one_of",
+          "valueType": "string",
+          "required": false,
+          "allowedValues": [
+            "END",
+            "NONE"
+          ],
+          "_default": "NONE"
+        }
+      ]
+    },
+    {
+      "model": "cohere-rerank-3.5",
+      "shortDescription": "Cohere's leading reranking model, balancing performance and latency for a wide range of enterprise search applications.",
+      "type": "rerank",
+      "modality": "text",
+      "maxSequenceLength": 40000,
+      "maxBatchSize": 200,
+      "providerName": "Cohere",
+      "supportedParameters": [
+        {
+          "parameter": "max_chunks_per_doc",
+          "type": "numeric_range",
+          "valueType": "integer",
+          "required": false,
+          "min": 1,
+          "max": 3072,
+          "_default": 3072
+        }
+      ]
+    },
+    {
+      "model": "pinecone-rerank-v0",
+      "shortDescription": "A state of the art reranking model that out-performs competitors on widely accepted benchmarks. It can handle chunks up to 512 tokens (1-2 paragraphs)",
+      "type": "rerank",
+      "modality": "text",
+      "maxSequenceLength": 512,
+      "maxBatchSize": 100,
+      "providerName": "Pinecone",
+      "supportedParameters": [
+        {
+          "parameter": "truncate",
+          "type": "one_of",
+          "valueType": "string",
+          "required": false,
+          "allowedValues": [
+            "END",
+            "NONE"
+          ],
+          "_default": "END"
+        }
+      ]
+    }
+  ]
+}

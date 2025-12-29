@@ -1,5 +1,6 @@
 import axios from "axios";
 import prisma from "../config/prisma";
+import { EmbeddingService } from "./embeddingService";
 
 interface ExtractedFacts {
   terminationRights?: string | null;
@@ -31,19 +32,110 @@ interface ExtractedFacts {
 export class AIExtractionService {
   private readonly apiKey: string;
   private readonly apiUrl = "https://api.deepseek.com/v1/chat/completions";
+  private embeddingService: EmbeddingService;
 
   constructor() {
     this.apiKey = process.env.DEEPSEEK_API_KEY || "";
     if (!this.apiKey) {
       throw new Error("DEEPSEEK_API_KEY is not configured");
     }
+    this.embeddingService = new EmbeddingService();
   }
 
   public async extractFacts(fileId: number): Promise<ExtractedFacts> {
     const file = await this.getFileWithText(fileId);
-    const prompt = this.createExtractionPrompt(file.extractedText ?? "");
+
+    // --- VECTOR RAG FOR EXTRACTION ---
+    // Instead of just the first 6000 chars, we retrieve the most "information-dense" chunks.
+    // POLLING: Wait for vectorization to COMPLETE if this is a fresh upload
+    let fileMeta = await (prisma as any).file.findUnique({
+      where: { id: fileId },
+      select: { vectorStatus: true, extractedText: true }
+    });
+
+    let attempts = 0;
+    // Wait for COMPLETED or FAILED status (max 120 seconds)
+    while (fileMeta?.vectorStatus !== "COMPLETED" && fileMeta?.vectorStatus !== "FAILED" && attempts < 60) {
+      console.log(`RAG: Waiting for vectorization for file ${fileId} (Status: ${fileMeta?.vectorStatus}, Attempt ${attempts + 1}/60)...`);
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      fileMeta = await (prisma as any).file.findUnique({
+        where: { id: fileId },
+        select: { vectorStatus: true, extractedText: true }
+      });
+      attempts++;
+    }
+
+    if (fileMeta?.vectorStatus !== "COMPLETED") {
+      console.warn(`RAG: Vectorization did not complete for file ${fileId} (Status: ${fileMeta?.vectorStatus}). Falling back to truncated text.`);
+      const contextText = fileMeta?.extractedText?.substring(0, 8000) || "";
+      const prompt = this.createExtractionPrompt(contextText);
+      const aiResponse = await this.callDeepSeekAPI(prompt);
+      return this.processAIResponse(fileId, aiResponse);
+    }
+
+    // For extraction, we search for broad terms to get a good spread of the document.
+    const searchTerms = [
+      "termination notice period",
+      "KPI performance spreading depth",
+      "compensation fees service monthly",
+      "governing law dispute resolution arbitration",
+      "allocation size fdv exchange",
+      "clawback reporting cure period",
+      "asset protection segregation"
+    ];
+
+    const allRelevantChunks = new Set<string>();
+
+    for (const term of searchTerms) {
+      console.log(`RAG: Finding relevant chunks for "${term}" in Pinecone...`);
+      const termEmbedding = await this.embeddingService.generateEmbedding(term);
+      const matchingChunks = await this.embeddingService.search(fileId, termEmbedding, 5);
+
+      matchingChunks.forEach((text) => allRelevantChunks.add(text));
+    }
+
+    console.log(`RAG: Retrieved ${allRelevantChunks.size} unique semantic chunks for Fact Extraction via Pinecone.`);
+
+    const contextText = Array.from(allRelevantChunks).join("\n\n---\n\n");
+    console.log("--- START OF PINECONE METADATA (TEXT GIVEN TO DEEPSEEK) ---");
+    console.log(contextText);
+    console.log("--- END OF PINECONE METADATA ---");
+
+    const prompt = this.createExtractionPrompt(contextText);
     const aiResponse = await this.callDeepSeekAPI(prompt);
-    return this.processAIResponse(fileId, aiResponse);
+
+    // --- VERIFICATION LOOP (ROBUSTNESS) ---
+    console.log(`RAG: Running verification pass for file ${fileId}...`);
+    const verifiedFacts = await this.verifyResults(aiResponse, contextText);
+
+    return this.processAIResponse(fileId, verifiedFacts);
+  }
+
+  private async verifyResults(initialResponse: string, contextText: string): Promise<string> {
+    const verificationPrompt = `You are a legal auditor. Your task is to verify the accuracy of the extracted contract JSON below based on the original contract snippets.
+    
+SOURCE CONTRACT SNIPPETS:
+${contextText}
+
+INITIAL EXTRACTION RESULT:
+${initialResponse}
+
+INSTRUCTIONS:
+1. Compare the JSON values against the source text.
+2. If you find a mistake (e.g., notice period says 30 in JSON but 60 in text), FIX it in the JSON.
+3. Ensure every field follows the allowed options in the schema.
+4. If a value is missing or null but exists in the source text, fill it.
+5. Return ONLY the final, corrected JSON object.
+
+Corrected JSON:`;
+
+    try {
+      const correctedResponse = await this.callDeepSeekAPI(verificationPrompt);
+      return correctedResponse;
+    } catch (err) {
+      console.warn("Verification Loop failed, falling back to initial extraction.", err);
+      return initialResponse;
+    }
   }
 
   private async getFileWithText(fileId: number) {
@@ -113,8 +205,9 @@ Return ONLY valid JSON matching this exact structure:
   "exclusivityMonths": number
 }
 
-Contract text (abbreviated):
-${text.substring(0, 6000)}`;
+Contract text (Relevant Sections):
+${text}
+`;
   }
 
   private async callDeepSeekAPI(prompt: string): Promise<string> {
