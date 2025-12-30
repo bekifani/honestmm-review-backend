@@ -114,7 +114,7 @@ Return ONLY valid JSON matching this exact structure:
 }
 
 Contract text (abbreviated):
-${text.substring(0, 6000)}`;
+${text.substring(0, 125000)}`;
   }
 
   private async callDeepSeekAPI(prompt: string): Promise<string> {
