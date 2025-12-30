@@ -43,6 +43,14 @@ export const verifyCheckoutSession = async (req: Request, res: Response) => {
       return res.status(404).json({ error: "Session not found" });
     }
 
+    // Security check: Ensure payment is actually completed
+    if (session.payment_status !== 'paid') {
+      return res.status(400).json({
+        error: "Payment not completed",
+        message: "This session has not been paid for yet."
+      });
+    }
+
     // Ensure session belongs to this user via metadata or customer match
     const metaUserId = session.metadata?.userId ? parseInt(session.metadata.userId) : undefined;
     if (metaUserId && metaUserId !== userId) {

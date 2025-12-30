@@ -11,7 +11,7 @@ export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 export const SUBSCRIPTION_PLANS = {
   tier1: {
     name: "QuickScan",
-    priceId: process.env.TIER1_PRICE_ID || "price_quickscan_placeholder",
+    priceId: process.env.TIER1_PRICE_ID ,
     mode: "payment" as const,
     maxFileAnalyses: 3,
     maxChatMessages: 10,
@@ -26,7 +26,7 @@ export const SUBSCRIPTION_PLANS = {
   },
   tier2: {
     name: "Professional Review",
-    priceId: process.env.TIER2_PRICE_ID || "price_professional_placeholder",
+    priceId: process.env.TIER2_PRICE_ID,
     mode: "payment" as const,
     maxFileAnalyses: 10,
     maxChatMessages: 20,
@@ -41,7 +41,7 @@ export const SUBSCRIPTION_PLANS = {
   },
   tier3: {
     name: "Strategic Package",
-    priceId: process.env.TIER3_PRICE_ID || "price_strategic_placeholder",
+    priceId: process.env.TIER3_PRICE_ID ,
     mode: "payment" as const,
     maxFileAnalyses: -1,
     maxChatMessages: -1,
@@ -58,7 +58,7 @@ export const SUBSCRIPTION_PLANS = {
   },
   tier4: {
     name: "Advisory Retainer",
-    priceId: process.env.TIER4_PRICE_ID || "price_advisory_placeholder",
+    priceId: process.env.TIER4_PRICE_ID,
     mode: "subscription" as const,
     maxFileAnalyses: -1, // Unlimited
     maxChatMessages: -1, // Unlimited
