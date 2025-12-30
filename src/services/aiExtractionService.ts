@@ -153,7 +153,6 @@ ${text.substring(0, 125000)}`;
 
       return (response.data as any).choices[0].message.content;
     } catch (error) {
-      console.error("DeepSeek API call failed:", error);
       throw new Error("AI extraction service unavailable");
     }
   }
@@ -182,7 +181,6 @@ ${text.substring(0, 125000)}`;
       // Fill missing required fields with null instead of erroring
       for (const field of requiredFields) {
         if (!(field in facts)) {
-          console.warn(`AI response missing field: ${field}, setting to null`);
           (facts as any)[field] = null;
         }
       }
@@ -196,7 +194,6 @@ ${text.substring(0, 125000)}`;
 
       return facts;
     } catch (error) {
-      console.error("AI response processing failed:", error);
       throw new Error("Failed to process AI extraction results");
     }
   }

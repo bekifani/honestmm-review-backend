@@ -105,8 +105,6 @@ const telegramVerify = async (req: Request,
 
     return done(null, findUser);
   } catch (error) {
-    // logger.error(error);
-    console.log({ error });
     return done(error as Error, false);
   }
 };
@@ -162,7 +160,6 @@ const googleVerify = async (req: Request, accessToken: string, refreshToken: str
 
     return done(null, user);
   } catch (error) {
-    console.error("Google OAuth error:", error);
     return done(error, false);
   }
 };
@@ -213,7 +210,6 @@ const twitterVerify = async (req: Request, accessToken: string, refreshToken: st
 
     return done(null, user);
   } catch (error) {
-    console.error("Twitter OAuth error:", error);
     return done(error, false);
   }
 };

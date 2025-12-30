@@ -34,7 +34,6 @@ export const checkFileAnalysisLimit = async (
 
     next();
   } catch (error) {
-    console.error("Usage limit check error:", error);
     res.status(500).json({ error: "Failed to check usage limits" });
   }
 };
@@ -70,7 +69,6 @@ export const checkChatMessageLimit = async (
 
     next();
   } catch (error) {
-    console.error("Usage limit check error:", error);
     res.status(500).json({ error: "Failed to check usage limits" });
   }
 };
@@ -104,7 +102,6 @@ export const requireActiveSubscription = async (
 
     next();
   } catch (error) {
-    console.error("Subscription check error:", error);
     res.status(500).json({ error: "Failed to check subscription" });
   }
 };

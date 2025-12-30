@@ -62,7 +62,7 @@ export const uploadFile = async (req: Request, res: Response) => {
         extractedText = buffer.toString("utf-8");
       }
     } catch (extractError) {
-      console.warn("Text extraction failed:", extractError);
+      // Extraction failed silently or handled elsewhere
     }
 
     const file = await prisma.file.create({
@@ -89,7 +89,6 @@ export const uploadFile = async (req: Request, res: Response) => {
 
     res.status(201).json(file);
   } catch (error) {
-    console.error("Upload error:", error);
     res.status(500).json({ error: "Server error during file upload" });
   }
 };
@@ -119,7 +118,6 @@ export const getFile = async (req: Request, res: Response) => {
 
     res.json(file);
   } catch (error) {
-    console.error("Get file error:", error);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -190,7 +188,7 @@ export const getAllFiles = async (req: Request, res: Response) => {
               review.content = content;
             }
           } catch (e) {
-            console.error("Redaction in getAllFiles failed", e);
+            // Redaction failed
           }
         }
       }
@@ -278,7 +276,6 @@ export const analyzeFile = async (req: Request, res: Response) => {
       scoringResult: finalScoringResult,
     });
   } catch (error) {
-    console.error("Analysis error:", error);
     res.status(500).json({
       error: "Analysis failed",
       details: error instanceof Error ? error.message : "Unknown error",

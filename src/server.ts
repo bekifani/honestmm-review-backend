@@ -169,12 +169,6 @@ app.use(
 // Global Error Handler for JSON parsing and other body-parsing errors
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   if (err instanceof SyntaxError && 'status' in err && err.status === 400 && 'body' in err) {
-    console.error(`Malformed JSON request detected:`, {
-      method: req.method,
-      url: req.url,
-      bodySnippet: (err as any).body ? String((err as any).body).substring(0, 100) : "N/A",
-      error: err.message
-    });
     return res.status(400).json({
       error: "Invalid JSON payload",
       message: err.message,
@@ -187,8 +181,6 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 websocketService.initialize(httpServer);
 
 httpServer.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔌 WebSocket server ready on ws://localhost:${PORT}`);
 });
 
 process.on("SIGTERM", async () => {

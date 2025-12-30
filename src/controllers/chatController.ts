@@ -39,7 +39,6 @@ export const saveChat = async (req: Request, res: Response) => {
 
         res.status(201).json(chat);
     } catch (error) {
-        console.error("Save chat error:", error);
         res.status(500).json({ error: "Server error" });
     }
 };
@@ -68,7 +67,6 @@ export const getChats = async (req: Request, res: Response) => {
 
         res.json(chats);
     } catch (error) {
-        console.error("Get chats error:", error);
         res.status(500).json({ error: "Server error" });
     }
 };
@@ -116,7 +114,6 @@ export const askAI = async (req: Request, res: Response) => {
             chatLogId: result.chatLogId,
         });
     } catch (error) {
-        console.error("Ask AI error:", error);
         return res.status(500).json({ error: "Failed to process question" });
     }
 };
@@ -143,7 +140,6 @@ export const clearChatContext = async (req: Request, res: Response) => {
         const result = await chatService.clearContext(sessionId, Number(fileId), userId);
         return res.json(result);
     } catch (error) {
-        console.error("Clear chat error:", error);
         return res.status(500).json({ error: "Failed to clear context" });
     }
 };

@@ -32,7 +32,6 @@ export const saveReview = async (req: Request, res: Response) => {
 
         res.status(201).json(review);
     } catch (error) {
-        console.error("Save review error:", error);
         res.status(500).json({ error: "Server error" });
     }
 };
@@ -119,7 +118,7 @@ export const getReviewsByFileId = async (req: Request, res: Response) => {
                         review.content = contentValue;
                     }
                 } catch (e) {
-                    console.error("Redaction in getReviewsByFileId failed", e);
+                    // Redaction failed
                 }
             }
             return review;

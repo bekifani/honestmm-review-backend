@@ -47,7 +47,6 @@ export const createShareLink = async (req: Request, res: Response) => {
         // Return the token (Frontend constructs the URL)
         res.json({ token });
     } catch (error) {
-        console.error("Create share link error:", error);
         res.status(500).json({ error: "Server error" });
     }
 };
@@ -124,7 +123,7 @@ export const getSharedContent = async (req: Request, res: Response) => {
                         review.content = contentValue;
                     }
                 } catch (e) {
-                    console.error("Redaction in getSharedContent failed", e);
+                    // Redaction failed
                 }
             }
             return review;
@@ -140,7 +139,6 @@ export const getSharedContent = async (req: Request, res: Response) => {
             reviews: redactedReviews
         });
     } catch (error) {
-        console.error("Get shared content error:", error);
         res.status(500).json({ error: "Server error" });
     }
 };

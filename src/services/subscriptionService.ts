@@ -183,7 +183,6 @@ export class SubscriptionService {
 
     // Auto-repair logic: if date is 1970, fix it immediately to prevent infinite reset loops
     if (subscription && subscription.status === "active" && subscription.currentPeriodEnd.getFullYear() === 1970) {
-      console.warn(`Detected 1970 date for user ${userId}, auto-repairing...`);
       const repairedSub = await this.autoRepairSubscription(userId, subscription.stripeSubscriptionId);
       if (repairedSub) {
         // Use repaired subscription for checks
@@ -428,7 +427,6 @@ export class SubscriptionService {
         },
       });
     } catch (error) {
-      console.error("Auto-repair failed:", error);
       // Fallback: just update DB with +30 days
       const now = new Date();
       const nextMonth = new Date();

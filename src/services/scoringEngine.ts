@@ -137,7 +137,6 @@ export class ScoringEngine {
     try {
       return new Function("facts", `return ${condition}`)(facts);
     } catch (error) {
-      console.error(`Condition evaluation failed for "${condition}":`, error);
       return false;
     }
   }
@@ -299,7 +298,6 @@ export class ScoringEngine {
   }
 
   public scoreAgreement(facts: any): ScoringResult {
-    console.log("Input facts:", facts);
 
     const result: ScoringResult = {
       totalScore: 0,
@@ -587,7 +585,6 @@ export class ScoringEngine {
     // Merge with any existing recommendations and ensure uniqueness
     result.recommendations = Array.from(new Set([...result.recommendations, ...collectedRecommendations]));
 
-    console.log("Scoring result (post-snapping):", result);
     return result;
   }
 

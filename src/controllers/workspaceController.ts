@@ -22,7 +22,6 @@ export const createWorkspace = async (req: Request, res: Response) => {
 
         res.status(201).json(workspace);
     } catch (error) {
-        console.error("Create workspace error:", error);
         res.status(500).json({ error: "Server error" });
     }
 };
@@ -46,7 +45,6 @@ export const getWorkspaces = async (req: Request, res: Response) => {
 
         res.json(workspaces);
     } catch (error) {
-        console.error("Get workspaces error:", error);
         res.status(500).json({ error: "Server error" });
     }
 };
@@ -99,7 +97,6 @@ export const deleteWorkspace = async (req: Request, res: Response) => {
 
         res.json({ success: true });
     } catch (error) {
-        console.error("Delete workspace error:", error);
         res.status(500).json({ error: "Server error" });
     }
 };

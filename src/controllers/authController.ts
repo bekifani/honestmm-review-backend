@@ -88,7 +88,6 @@ export const register = async (req: Request, res: Response) => {
 
     return res.sendStatus(201);
   } catch (err) {
-    console.error("Register error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 };
@@ -143,7 +142,6 @@ export const login = async (req: Request, res: Response) => {
     const { password: _userPassword, ...userData } = user as any;
     return res.json({ status: "success", user: userData });
   } catch (err) {
-    console.error(err);
     return res.status(500).json({ error: "Server error" });
   }
 };
@@ -183,7 +181,6 @@ export const sendVerificationEmail = async (req: Request, res: Response) => {
     await sendEmailVerify(email, otp);
     return res.sendStatus(204);
   } catch (err) {
-    console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
 };
@@ -279,7 +276,6 @@ export const verifyEmail = async (req: Request, res: Response) => {
     });
 
   } catch (err) {
-    console.error(err);
     return res.status(500).json({ error: 'Server error' });
   }
 };
@@ -352,7 +348,6 @@ export const forgotPassword = async (req: Request, res: Response) => {
     await sendResetPasswordEmail(email, otp);
     res.status(204).send();
   } catch (error) {
-    console.log({ error });
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -422,7 +417,6 @@ export const verifyOtp = async (req: Request, res: Response) => {
     await prisma.otp.delete({ where: { id: otpData.id } });
     res.status(204).send();
   } catch (error) {
-    console.log(error);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -500,7 +494,6 @@ export const resetPassword = async (req: Request, res: Response) => {
 
     res.status(204).send();
   } catch (error) {
-    console.log(error);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -540,7 +533,6 @@ export const refreshToken = async (req: Request, res: Response) => {
 
     res.send({ user: userData });
   } catch (error) {
-    console.log(error);
     res.status(500).json({ error: "Server error" });
   }
 };
@@ -679,7 +671,6 @@ export const updatePassword = async (req: Request, res: Response) => {
       message: "Password updated successfully",
     });
   } catch (error) {
-    console.error("Update password error:", error);
     res.status(500).json({
       status: "error",
       message: "Server error",

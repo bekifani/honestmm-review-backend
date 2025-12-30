@@ -15,7 +15,6 @@ export const getPlans = async (req: Request, res: Response) => {
       plans: SUBSCRIPTION_PLANS,
     });
   } catch (error) {
-    console.error("Get plans error:", error);
     res.status(500).json({ error: "Failed to fetch plans" });
   }
 };
@@ -161,7 +160,6 @@ export const verifyCheckoutSession = async (req: Request, res: Response) => {
 
     return res.json({ verified: true, status: "active", plan, sessionId: session.id });
   } catch (error) {
-    console.error("Verify checkout session error:", error);
     return res.status(500).json({ error: "Failed to verify session" });
   }
 };
@@ -209,7 +207,6 @@ export const createCheckoutSession = async (req: Request, res: Response) => {
 
     res.json({ sessionId: session.id, url: session.url });
   } catch (error) {
-    console.error("Create checkout session error:", error);
     res.status(500).json({ error: "Failed to create checkout session" });
   }
 };
@@ -233,7 +230,6 @@ export const getCurrentSubscription = async (req: Request, res: Response) => {
 
     res.json({ subscription });
   } catch (error) {
-    console.error("Get subscription error:", error);
     res.status(500).json({ error: "Failed to fetch subscription" });
   }
 };
@@ -270,7 +266,6 @@ export const trackSupportClick = async (req: Request, res: Response) => {
 
     res.json({ success: true, remaining: usageCheck.remaining - 1 });
   } catch (error) {
-    console.error("Track support click error:", error);
     res.status(500).json({ error: "Failed to track support usage" });
   }
 };
@@ -300,7 +295,6 @@ export const cancelSubscription = async (req: Request, res: Response) => {
       subscription,
     });
   } catch (error) {
-    console.error("Cancel subscription error:", error);
     res.status(500).json({
       error: "Failed to cancel subscription",
       details: error instanceof Error ? error.message : "Unknown error",
@@ -325,7 +319,6 @@ export const createBillingPortalSession = async (req: Request, res: Response) =>
 
     res.json({ url: session.url });
   } catch (error) {
-    console.error("Create billing portal session error:", error);
     res.status(500).json({
       error: "Failed to create billing portal session",
       details: error instanceof Error ? error.message : "Unknown error",
@@ -352,7 +345,6 @@ export const handleWebhook = async (req: Request, res: Response) => {
       process.env.STRIPE_WEBHOOK_SECRET!
     );
   } catch (err) {
-    console.error("Webhook signature verification failed:", err);
     return res.status(400).json({ error: "Invalid signature" });
   }
 
@@ -389,12 +381,11 @@ export const handleWebhook = async (req: Request, res: Response) => {
       }
 
       default:
-        console.log(`Unhandled event type: ${event.type}`);
+      // Handle unhandled event
     }
 
     res.json({ received: true });
   } catch (error) {
-    console.error("Webhook handler error:", error);
     res.status(500).json({ error: "Webhook handler failed" });
   }
 };
@@ -407,7 +398,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   const plan = session.metadata?.plan;
 
   if (!userId || !plan) {
-    console.error("Missing userId or plan in session metadata");
     return;
   }
 
@@ -424,7 +414,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
     const firstItem = subscription.items.data[0];
     if (!firstItem || !firstItem.price) {
-      console.error("No subscription items found");
       return;
     }
 
@@ -449,7 +438,6 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
     const firstItem = fullSession.line_items?.data[0];
     if (!firstItem || !firstItem.price) {
-      console.error("No line items found in session");
       return;
     }
 
@@ -461,19 +449,16 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
     currentPeriodStart = new Date();
     currentPeriodEnd = new Date();
     currentPeriodEnd.setDate(currentPeriodEnd.getDate() + 30); // Grant 30 days access
+    await subscriptionService.createSubscription(
+      userId,
+      subscriptionId,
+      priceId,
+      productId,
+      plan as any,
+      currentPeriodStart,
+      currentPeriodEnd
+    );
   }
-
-  await subscriptionService.createSubscription(
-    userId,
-    subscriptionId,
-    priceId,
-    productId,
-    plan as any,
-    currentPeriodStart,
-    currentPeriodEnd
-  );
-
-  console.log(`Subscription created for user ${userId}, plan: ${plan}`);
 }
 
 /**
@@ -497,8 +482,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
     currentPeriodStart,
     currentPeriodEnd
   );
-
-  console.log(`Subscription ${subscription.id} updated to status: ${subscription.status}`);
 }
 
 /**
@@ -506,8 +489,6 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
  */
 async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
   await subscriptionService.updateSubscriptionStatus(subscription.id, "canceled");
-
-  console.log(`Subscription ${subscription.id} canceled`);
 }
 
 /**
@@ -527,8 +508,6 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
         new Date(((subscription as any).current_period_end || 0) * 1000)
       );
     }
-
-    console.log(`Invoice paid for subscription ${subscriptionId}, usage reset`);
   }
 }
 
@@ -540,8 +519,6 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
 
   if (subscriptionId && typeof subscriptionId === 'string') {
     await subscriptionService.updateSubscriptionStatus(subscriptionId, "past_due");
-
-    console.log(`Payment failed for subscription ${subscriptionId}`);
   }
 }
 
@@ -609,7 +586,6 @@ export const getUsageStats = async (req: Request, res: Response) => {
       usageResetAt: subscription.usageResetAt,
     });
   } catch (error) {
-    console.error("Get usage stats error:", error);
     res.status(500).json({ error: "Failed to fetch usage statistics" });
   }
 };

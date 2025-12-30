@@ -55,7 +55,6 @@ export async function requireAuth(
 
     next();
   } catch (err) {
-    console.log("Authorization error: ", err);
     return res.status(401).json({ error: "Unauthorized" });
   }
 }

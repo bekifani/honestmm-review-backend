@@ -19,12 +19,12 @@ export const getUsers = async (req: Request, res: Response) => {
     const idSearch = parseInt(qRaw, 10);
     const searchFilter = qRaw
       ? {
-          OR: [
-            { name: { contains: qRaw, mode: "insensitive" as const } },
-            { email: { contains: qRaw, mode: "insensitive" as const } },
-            ...(isNaN(idSearch) ? [] : [{ id: idSearch }]),
-          ],
-        }
+        OR: [
+          { name: { contains: qRaw, mode: "insensitive" as const } },
+          { email: { contains: qRaw, mode: "insensitive" as const } },
+          ...(isNaN(idSearch) ? [] : [{ id: idSearch }]),
+        ],
+      }
       : {};
 
     const where = { ...roleFilter, ...searchFilter } as any;
@@ -56,7 +56,6 @@ export const getUsers = async (req: Request, res: Response) => {
       meta: { page, limit, totalPages: Math.max(Math.ceil(totalCount / limit), 1), totalCount },
     });
   } catch (error) {
-    console.error(error);
     res.status(500).json({ error: "Failed to fetch users" });
   }
 };
@@ -85,7 +84,6 @@ export const getUserById = async (req: Request, res: Response) => {
     if (!user) return res.status(404).json({ error: "User not found" });
     res.json({ status: "success", data: user });
   } catch (error) {
-    console.error(error);
     res.status(500).json({ error: "Failed to fetch user" });
   }
 };
@@ -139,7 +137,6 @@ export const createUser = async (req: Request, res: Response) => {
       data: user,
     });
   } catch (error) {
-    console.error("Create user error:", error);
     res.status(500).json({ error: "Failed to create user" });
   }
 };
@@ -193,7 +190,6 @@ export const updateUser = async (req: Request, res: Response) => {
       data: updatedUser,
     });
   } catch (error) {
-    console.error("Update user error:", error);
     res.status(500).json({ error: "Failed to update user" });
   }
 };
@@ -223,7 +219,6 @@ export const deleteUser = async (req: Request, res: Response) => {
       message: "User deleted successfully",
     });
   } catch (error) {
-    console.error("Delete user error:", error);
     res.status(500).json({ error: "Failed to delete user" });
   }
 };
