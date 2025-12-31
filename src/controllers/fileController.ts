@@ -26,7 +26,7 @@ export const uploadFile = async (req: Request, res: Response) => {
     // Free plan: limit number of uploaded files (lifetime) when no active subscription
     const subscription = await subscriptionService.getUserSubscription(userId);
     if (!subscription || subscription.status !== "active") {
-      const FREE_FILE_UPLOADS = Number(process.env.FREE_FILE_UPLOADS ?? 4);
+      const FREE_FILE_UPLOADS = Number(process.env.FREE_FILE_UPLOADS ?? 3);
       if (FREE_FILE_UPLOADS > 0) {
         const usedUploads = await prisma.usageLog.count({
           where: { userId, usageType: "file_upload" },
@@ -128,11 +128,9 @@ export const getAllFiles = async (req: Request, res: Response) => {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const { workspaceId } = req.query;
+
     const whereClause: any = { userId };
 
-    // Explicitly check for 'undefined' string or empty string to avoid filtering if not intended
-    // But if we want to filter by "No Workspace" (null), client should send specific flag?
-    // For now, if workspaceId is provided, filter by it.
     if (workspaceId && workspaceId !== 'all') {
       whereClause.workspaceId = Number(workspaceId);
     }
@@ -143,59 +141,85 @@ export const getAllFiles = async (req: Request, res: Response) => {
     const files = await prisma.file.findMany({
       where: whereClause,
       orderBy: { createdAt: "desc" },
-      include: {
+      select: {
+        id: true,
+        filename: true,
+        filetype: true,
+        filesize: true,
+        createdAt: true,
+        workspaceId: true,
+        userId: true,
+        // Exclude extractedText
         reviews: {
           orderBy: { createdAt: "desc" },
           take: 1,
+          select: {
+            id: true,
+            createdAt: true,
+            content: true,
+          }
         },
       },
     });
 
-    // Redact analysis content in getAllFiles for free users
-    const redactedFiles = files.map((file: any) => {
-      if (!isPro && file.reviews && file.reviews.length > 0) {
+    // Process analysis content for listing
+    const processedFiles = files.map((file: any) => {
+      let analysisSummary = null;
+      if (file.reviews && file.reviews.length > 0) {
         const review = file.reviews[0];
-        if (review && review.content) {
+        let content = review.content;
+        if (typeof content === 'string') {
           try {
-            const content = typeof review.content === 'string' ? JSON.parse(review.content) : review.content;
-
-            // Check if it's the wrapped object or the raw scoring result
-            if (content.scoringResult) {
-              content.scoringResult = scoringEngine.redactResult(content.scoringResult);
-            } else {
-              // Usually the 'content' field in review table is the whole scoringResult
-              // or it has been saved as the wrapped object. We try to redact as ScoringResult.
-              // redactResult handles property checks internally.
-              const redactedResult = scoringEngine.redactResult(content);
-
-              if (typeof review.content === 'string') {
-                review.content = JSON.stringify(redactedResult);
-              } else {
-                review.content = redactedResult;
-              }
-              return file;
-            }
-
-            if (content.extractedFacts) {
-              content.extractedFacts = {
-                message: "Upgrade to Pro to unlock detailed extracted contract terms."
-              };
-            }
-
-            if (typeof review.content === 'string') {
-              review.content = JSON.stringify(content);
-            } else {
-              review.content = content;
-            }
+            content = JSON.parse(content);
           } catch (e) {
-            // Redaction failed
+            content = {};
           }
         }
+
+        // Helper to get grade from score
+        const calculateGrade = (s: number) => {
+          if (s >= 90) return 'A';
+          if (s >= 80) return 'B';
+          if (s >= 70) return 'C';
+          if (s >= 60) return 'D';
+          return 'F';
+        };
+
+        const scoreValue = content?.score || content?.totalScore || content?.overall_score?.score || null;
+        const gradeValue = content?.grade || (scoreValue !== null ? calculateGrade(scoreValue) : null);
+
+        // For listing, we always provide a minimal overall_score structure for compatibility
+        analysisSummary = {
+          id: review.id,
+          status: content?.status || "completed",
+          score: scoreValue,
+          overall_score: content?.overall_score || {
+            quality_rating: gradeValue,
+            quality_score: scoreValue,
+            letter_grade: gradeValue?.charAt(0) || null
+          },
+          createdAt: review.createdAt
+        };
+
+        // Redact if not pro
+        if (!isPro && analysisSummary.overall_score) {
+          analysisSummary.overall_score.quality_rating = "PRO Feature";
+          analysisSummary.overall_score.letter_grade = "P";
+        }
       }
-      return file;
+
+      // Return optimized file object
+      const { reviews, filetype, filesize, ...fileData } = file;
+      return {
+        ...fileData,
+        mimetype: filetype,
+        size: filesize,
+        analysis: analysisSummary
+      };
     });
 
-    res.json(redactedFiles);
+    res.json({ files: processedFiles });
+
   } catch (error) {
     res.status(500).json({ error: "Server error" });
   }

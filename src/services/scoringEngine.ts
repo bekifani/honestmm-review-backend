@@ -186,38 +186,58 @@ export class ScoringEngine {
     return roundedScore;
   }
 
+  private maskText(text: string, index: number = 0): string {
+    if (!text) return "";
+    const len = text.length;
+
+    // Variety of professional placeholder phrases
+    const placeholders = [
+      "Upgrade to Pro to unlock this insight. ",
+      "Detailed strategic analysis is available for Pro subscribers. ",
+      "Unlock full recommendations and risk assessments with a Pro plan. ",
+      "Access the complete expert review by upgrading your account. ",
+      "Professional insights and risk mitigation steps are locked. "
+    ];
+
+    let placeholder = placeholders[index % placeholders.length];
+    if (!placeholder) placeholder = placeholders[0] || "Upgrade to Pro to unlock this insight. ";
+
+    // Repeat the placeholder enough times to cover the length, then slice to exact length
+    let result = placeholder.repeat(Math.ceil(len / placeholder.length));
+    return result.slice(0, len);
+  }
+
   public redactResult(result: ScoringResult): any {
     const redacted = JSON.parse(JSON.stringify(result));
-    const REDACTION_MESSAGE = "Upgrade to Pro to unlock detailed findings and strategic advice.";
 
-    // Redact main recommendations
+    // Mask main recommendations
     if (redacted.recommendations) {
-      redacted.recommendations = redacted.recommendations.map(() => REDACTION_MESSAGE);
+      redacted.recommendations = redacted.recommendations.map((r: string, i: number) => this.maskText(r, i));
     }
 
-    // Redact main findings
+    // Mask main findings
     if (redacted.findings) {
-      redacted.findings = redacted.findings.map((f: any) => ({
+      redacted.findings = redacted.findings.map((f: any, i: number) => ({
         ...f,
-        // description: REDACTION_MESSAGE, // Keep description visible
-        recommendation: REDACTION_MESSAGE,
+        description: this.maskText(f.description, i),
+        recommendation: this.maskText(f.recommendation, i + 1), // Offset to vary description/recommendation
       }));
     }
 
-    // Redact flags
+    // Mask flags
     if (redacted.flags) {
-      redacted.flags = redacted.flags.map(() => "Potential risk identified (Upgrade to reveal)");
+      redacted.flags = redacted.flags.map((f: string, i: number) => this.maskText(f, i + 2));
     }
 
-    // Redact metric-level findings
+    // Mask metric-level findings
     if (redacted.metrics) {
       for (const metricId in redacted.metrics) {
         const metric = redacted.metrics[metricId];
         if (metric.findings) {
-          metric.findings = metric.findings.map((f: any) => ({
+          metric.findings = metric.findings.map((f: any, i: number) => ({
             ...f,
-            // description: REDACTION_MESSAGE, // Keep description visible
-            recommendation: REDACTION_MESSAGE,
+            description: this.maskText(f.description, i + 3),
+            recommendation: this.maskText(f.recommendation, i + 4),
           }));
         }
       }
@@ -526,16 +546,22 @@ export class ScoringEngine {
       result.metrics[metric.id] = metricResult;
     }
 
+    /* 
+    // Commented out the old separate total score calculation
     result.totalScore =
       totalPossible > 0 ? (totalAchieved / totalPossible) * 100 : 0;
+    */
 
     if (metrics.autoDowngrades) {
       for (const downgrade of metrics.autoDowngrades) {
         if (this.evaluateCondition(downgrade.condition, scoringFacts)) {
+          /*
+          // Commented out individual total adjustment to keep it in sync with categories
           result.totalScore = Math.max(
             0,
             result.totalScore + downgrade.adjustment
           );
+          */
           result.flags.push(`Auto-downgrade applied: ${downgrade.condition}`);
 
           if (downgrade.finding) {
@@ -566,8 +592,14 @@ export class ScoringEngine {
       }
     }
 
+    /*
+    // Commented out the total score snapping (floor/ceiling logic)
     // Snap the total score (max 100)
     result.totalScore = this.snapToDisplayScore(result.totalScore, 100);
+    */
+
+    // NEW LOGIC: Calculate total score as the exact sum of snapped categories
+    result.totalScore = Object.values(result.metrics).reduce((sum, metric) => sum + metric.achieved, 0);
 
     for (const grade of metrics.ratingScale) {
       if (result.totalScore >= grade.min) {
