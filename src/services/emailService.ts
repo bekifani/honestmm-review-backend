@@ -197,3 +197,33 @@ export const sendResetPasswordEmail = async (email: string, token: string) => {
     logger.error(`${error.message}, reset password email not sent`);
   }
 };
+
+export const sendSupportNotification = async (data: { firstName: string, lastName: string, email: string, message: string }) => {
+  try {
+    const supportEmail = process.env.SUPPORT_EMAIL || process.env.EMAIL_USER;
+    await transporter.sendMail({
+      from: `"HonestMM System" <${process.env.EMAIL_USER}>`,
+      to: supportEmail,
+      subject: `New Contact Form Submission from ${data.firstName} ${data.lastName}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+          <h2 style="color: #1a73e8; border-bottom: 2px solid #1a73e8; padding-bottom: 10px;">New Support Message</h2>
+          <div style="margin-top: 20px;">
+            <p><strong>From:</strong> ${data.firstName} ${data.lastName} (${data.email})</p>
+            <p><strong>Date:</strong> ${new Date().toLocaleString()}</p>
+            <hr style="border: 0; border-top: 1px solid #eee;" />
+            <p style="white-space: pre-wrap; background: #f9f9f9; padding: 15px; border-radius: 5px; color: #333;">${data.message}</p>
+          </div>
+          <p style="font-size: 12px; color: #777; margin-top: 30px; text-align: center;">
+            This is an automated notification from the HonestMM Contact Form.
+          </p>
+        </div>
+      `,
+    });
+    logger.info(`Support notification sent to ${supportEmail}`);
+  } catch (error: any) {
+    logger.error(`Failed to send support notification: ${error.message}`);
+    throw error;
+  }
+};
+
